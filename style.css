@@ -2545,3 +2545,10 @@ body.embedded .conn-net { display: none !important; }
 .ai-input textarea { overflow-x: hidden; overflow-y: hidden; white-space: pre-wrap; overflow-wrap: anywhere; word-break: keep-all; min-width: 0; scrollbar-width: thin; }
 .ai-input textarea.scroll { overflow-y: auto; }
 .ai-input textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 인증 키 보관 방식 */
+.ai-keep-seg { justify-self: start; flex-wrap: wrap; }
+.ai-keep-seg button:disabled { opacity: .45; cursor: not-allowed; }
+#ai-key-hint:empty, #ai-keep-note:empty { display: none; }
+#ai-key-hint, #ai-keep-note { margin: 0; }
+#ai-keep-field[hidden] { display: none; }
+#ai-key-del { min-width: 52px; }

@@ -1522,7 +1522,7 @@
     $('in-domain').dispatchEvent(new Event('input'));
     $('chk-save-domain').checked = false;
     globalColors = {};
-    setAuto(0); aiKey = ''; $('ai-key').value = ''; $('ai-key-keep').checked = false; keepKey(); syncKeyUi(); aiCfg = { provider: 'openai', model: '' }; renderAiSettings(); syncAiFab();
+    setAuto(0); aiCfg = { provider: 'openai', model: '' }; aiKeyReset(); renderAiSettings(); syncAiFab();
     applyTheme('auto');
     setMsg('초기화하였습니다. 보드와 이 브라우저에 저장된 두루보드 정보를 모두 삭제하였습니다.', 'ok');
   }
@@ -4293,8 +4293,9 @@
     return { provider: o.provider, model: typeof o.model === 'string' ? o.model.trim().slice(0, 100) : '', columns };
   }
   function aiApplyImport(o) {
-    if (aiCfg.provider !== o.provider) { aiKey = ''; $('ai-key').value = ''; keepKey(); syncKeyUi(); }
+    const provChanged = aiCfg.provider !== o.provider;
     aiCfg = { provider: o.provider, model: o.model };
+    if (provChanged) dropKey();
     saveAiCfg();
     Object.keys(o.columns).forEach((k) => { if (state.keys.includes(k)) aiPol[k] = o.columns[k]; });
     saveAiPol();
@@ -4304,50 +4305,328 @@
     syncAiFab();
     return true;
   }
-  // 인증 키: 기본은 메모리에만 보관. 선택 시 이 탭의 세션 저장소에 보관(탭을 닫으면 삭제)
+  // ── 인증 키 보관 ──
+  // · 웹 앱(Apps Script) 안: 웹 앱이 중계 함수를 제공하면 키를 스크립트 속성에 보관하고, AI 요청도 웹 앱이 대신 보냄(키가 화면으로 오지 않음)
+  // · 그 밖: 저장 안 함(메모리) / 이 탭 동안(세션 저장소) / 이 기기에 잠금 저장(패스키 PRF로 암호화, 30일)
   const KEY_SS = 'duruboard:aikey';
-  function keepKey() {
+  const LOCK_DAYS = 30;
+  let gasRelay = null;            // 웹 앱 중계 사용 시 { saved: { 공급자: true } }
+  let prfCap = null;              // 패스키 잠금 지원: true / false / null(시도 전 알 수 없음)
+  let keepMode = 'none';          // 'none' | 'tab' | 'device'
+  const b64 = (buf) => { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); };
+  const unb64 = (s) => { const t = atob(s); const u = new Uint8Array(t.length); for (let i = 0; i < t.length; i++) u[i] = t.charCodeAt(i); return u; };
+  const rnd = (n) => crypto.getRandomValues(new Uint8Array(n));
+
+  function lockRec() {
     try {
-      if ($('ai-key-keep').checked && aiKey) window.sessionStorage.setItem(KEY_SS, JSON.stringify({ p: aiCfg.provider, k: aiKey }));
+      const o = JSON.parse(store.get('aikeylock') || 'null');
+      if (!o || o.v !== 1) return null;
+      if (!(o.exp > Date.now())) { store.del('aikeylock'); return null; }
+      return o;
+    } catch (e) { return null; }
+  }
+  function lockFor(p) { const o = lockRec(); return o && o.p === p ? o : null; }
+  function aiLocked() { return !gasRelay && !aiKey && !!lockFor(aiCfg.provider); }
+  function setSession(on) {
+    try {
+      if (on && aiKey) window.sessionStorage.setItem(KEY_SS, JSON.stringify({ p: aiCfg.provider, k: aiKey }));
       else window.sessionStorage.removeItem(KEY_SS);
     } catch (e) { /* 사용 불가 */ }
   }
+  // 보관 방식에 맞게 저장 위치를 정리 (탭 저장은 즉시, 기기 잠금은 별도 처리)
+  function keepKey() {
+    setSession(keepMode === 'tab');
+    if (keepMode !== 'device') { store.del('aikeylock'); }
+  }
+  function prfAvailable() {
+    return !EMBED && window.isSecureContext && !!window.PublicKeyCredential && !!(navigator.credentials && navigator.credentials.create) && !!location.hostname && !!(window.crypto && crypto.subtle);
+  }
+  async function detectPrf() {
+    if (!prfAvailable()) return false;
+    try {
+      if (typeof PublicKeyCredential.getClientCapabilities === 'function') {
+        const c = await PublicKeyCredential.getClientCapabilities();
+        if (c && Object.prototype.hasOwnProperty.call(c, 'extension:prf')) return !!c['extension:prf'];
+      }
+    } catch (e) { /* 알 수 없음 */ }
+    return null;
+  }
+  async function prfEval(credId, salt) {
+    const a = await navigator.credentials.get({ publicKey: {
+      challenge: rnd(32), allowCredentials: [{ type: 'public-key', id: credId }], userVerification: 'required', timeout: 60000,
+      extensions: { prf: { eval: { first: salt } } }
+    } });
+    const r = a && a.getClientExtensionResults ? a.getClientExtensionResults().prf : null;
+    return r && r.results && r.results.first ? r.results.first : null;
+  }
+  async function newCred(salt) {
+    const c = await navigator.credentials.create({ publicKey: {
+      rp: { name: '두루보드' },
+      user: { id: rnd(16), name: '두루보드 인증 키 잠금', displayName: '두루보드 인증 키 잠금' },
+      challenge: rnd(32),
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { userVerification: 'required', residentKey: 'preferred' },
+      timeout: 60000,
+      extensions: { prf: { eval: { first: salt } } }
+    } });
+    const r = (c.getClientExtensionResults && c.getClientExtensionResults().prf) || {};
+    return { id: new Uint8Array(c.rawId), ok: r.enabled === true || !!r.results, first: r.results && r.results.first ? r.results.first : null };
+  }
+  function lockErr(e) {
+    if (e && e.code === 'noprf' && keepMode === 'device') { keepMode = 'none'; store.set('aikeep', 'none'); store.del('aikeycred'); }
+    if (e && e.code === 'noprf') return '이 기기·브라우저는 잠금 저장을 지원하지 않습니다. [이 탭 동안]을 사용하십시오.';
+    if (e && e.code === 'again') return '잠금 등록을 마쳤습니다. [저장]을 한 번 더 눌러 잠금 저장을 완료하십시오.';
+    if (e && e.name === 'NotAllowedError') return '인증이 취소되었거나 시간이 초과되었습니다. 다시 시도하십시오.';
+    if (e && e.name === 'OperationError') return '인증 키를 해제하지 못하였습니다. 잠금이 손상되었을 수 있으니 [저장 안 함]을 눌러 삭제한 뒤 다시 입력하십시오.';
+    return '잠금 처리에 실패하였습니다.' + (e && e.message ? ' (' + String(e.message).slice(0, 120) + ')' : '');
+  }
+  // 지문·얼굴·PIN 확인으로 얻은 값(PRF)으로 인증 키를 암호화하여 이 기기에 저장
+  async function lockKey(key) {
+    if (!prfAvailable()) throw Object.assign(new Error('noprf'), { code: 'noprf' });
+    const salt = rnd(32);
+    let id = null, secret = null;
+    const saved = store.get('aikeycred');
+    if (saved) { try { id = unb64(saved); } catch (e) { id = null; } }
+    if (!id) {
+      const c = await newCred(salt);
+      if (!c.ok) { prfCap = false; throw Object.assign(new Error('noprf'), { code: 'noprf' }); }
+      id = c.id;
+      store.set('aikeycred', b64(id));
+      secret = c.first;
+      if (!secret) {
+        try { secret = await prfEval(id, salt); } catch (e) { if (e && e.name === 'NotAllowedError') throw Object.assign(new Error('again'), { code: 'again' }); throw e; }
+      }
+    } else secret = await prfEval(id, salt);
+    if (!secret) { prfCap = false; throw Object.assign(new Error('noprf'), { code: 'noprf' }); }
+    prfCap = true;
+    const ck = await crypto.subtle.importKey('raw', secret, 'AES-GCM', false, ['encrypt']);
+    const iv = rnd(12);
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, ck, new TextEncoder().encode(key));
+    store.set('aikeylock', JSON.stringify({ v: 1, p: aiCfg.provider, cred: b64(id), salt: b64(salt), iv: b64(iv), ct: b64(ct), exp: Date.now() + LOCK_DAYS * 864e5 }));
+  }
+  async function unlockKey() {
+    const o = lockFor(aiCfg.provider);
+    if (!o) return false;
+    const secret = await prfEval(unb64(o.cred), unb64(o.salt));
+    if (!secret) throw Object.assign(new Error('noprf'), { code: 'noprf' });
+    const ck = await crypto.subtle.importKey('raw', secret, 'AES-GCM', false, ['decrypt']);
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(o.iv) }, ck, unb64(o.ct));
+    aiKey = new TextDecoder().decode(pt);
+    $('ai-key').value = aiKey;
+    syncKeyUi();
+    syncAiFab();
+    if ($('ai-log').querySelector('.ai-hello-warn')) aiReset();
+    return true;
+  }
+  async function doUnlock() {
+    msgTo('ai-set-msg', '지문·얼굴·PIN으로 잠금을 해제하십시오.');
+    try {
+      if (await unlockKey()) msgTo('ai-set-msg', '인증 키 잠금을 해제하였습니다. 이 페이지를 닫으면 다시 잠깁니다.', 'ok');
+    } catch (e) { msgTo('ai-set-msg', lockErr(e), 'error'); }
+  }
+  function lockDays() { const o = lockFor(aiCfg.provider); return o ? Math.max(1, Math.ceil((o.exp - Date.now()) / 864e5)) : 0; }
+
+  // 보관 방식 선택 (웹 앱 중계 시에는 숨김)
+  function renderKeep() {
+    const field = $('ai-keep-field');
+    field.hidden = !!gasRelay;
+    $('ai-key-hint').textContent = gasRelay
+      ? '인증 키는 이 웹 앱(Apps Script 스크립트 속성)에 보관되며 화면으로 전달되지 않습니다. AI 요청은 웹 앱이 대신 보냅니다.'
+      : '두루보드 전용 키를 발급하고, 공급자 화면에서 사용 한도를 설정하여 사용하십시오.';
+    if (gasRelay) return;
+    $('ai-keep').querySelectorAll('button').forEach((b) => {
+      const v = b.dataset.v;
+      b.setAttribute('aria-checked', String(v === keepMode));
+      if (v === 'device') { b.disabled = prfCap === false; b.title = prfCap === false ? '이 기기·브라우저에서는 사용할 수 없습니다' : ''; }
+    });
+    const d = lockDays();
+    $('ai-keep-note').textContent = keepMode === 'none' ? '페이지를 닫거나 새로 고치면 삭제됩니다.'
+      : keepMode === 'tab' ? '이 탭을 닫으면 삭제됩니다. 새로 고침해도 다시 입력하지 않습니다.'
+      : prfCap === false ? '이 기기·브라우저에서는 잠금 저장을 사용할 수 없습니다.'
+      : (d ? '이 기기에 잠금 저장되어 있습니다(' + d + '일 후 자동 삭제). 사용할 때 지문·얼굴·PIN으로 해제합니다. 개인 기기에서만 사용하십시오.'
+        : '키를 저장할 때 지문·얼굴·PIN으로 잠가 이 기기에 ' + LOCK_DAYS + '일간 보관합니다. 개인 기기에서만 사용하십시오.');
+  }
+  async function setKeep(v) {
+    if (v === keepMode && !(v === 'device' && aiKey && !lockFor(aiCfg.provider))) return;
+    const had = !!lockFor(aiCfg.provider) || keepMode === 'tab';
+    keepMode = v;
+    store.set('aikeep', v);
+    if (v === 'none') store.del('aikeycred');
+    keepKey();
+    syncKeyUi();
+    renderKeep();
+    syncAiFab();
+    if (v === 'device' && aiKey) {
+      msgTo('ai-set-msg', '지문·얼굴·PIN으로 확인하십시오.');
+      try { await lockKey(aiKey); msgTo('ai-set-msg', '인증 키를 이 기기에 잠금 저장하였습니다. ' + LOCK_DAYS + '일 후 자동 삭제됩니다.', 'ok'); }
+      catch (e) { msgTo('ai-set-msg', lockErr(e), 'error'); }
+      renderKeep();
+    } else if (v === 'none' && had) msgTo('ai-set-msg', '이 브라우저에 보관한 인증 키를 삭제하였습니다.', 'ok');
+    else msgTo('ai-set-msg', '');
+  }
+
   function syncKeyUi() {
+    const inp = $('ai-key'), btn = $('ai-key-btn');
+    if (gasRelay) {
+      const saved = !!gasRelay.saved[aiCfg.provider];
+      const editing = inp.dataset.editing === '1';
+      inp.readOnly = saved && !editing;
+      inp.classList.toggle('locked', saved && !editing);
+      if (!editing) inp.value = '';
+      inp.placeholder = saved && !editing ? '웹 앱에 저장되어 있습니다' : '공급자에서 발급받은 API 키';
+      btn.textContent = saved && !editing ? '변경' : '저장';
+      btn.classList.toggle('primary', !(saved && !editing));
+      btn.disabled = !(saved && !editing) && !inp.value.trim();
+      $('ai-key-del').hidden = !saved;
+      return;
+    }
+    $('ai-key-del').hidden = true;
+    const locked = aiLocked();
     const has = !!aiKey;
-    $('ai-key').readOnly = has;
-    $('ai-key').classList.toggle('locked', has);
-    $('ai-key-btn').textContent = has ? '수정' : '저장';
-    $('ai-key-btn').classList.toggle('primary', !has);
-    $('ai-key-btn').disabled = !has && !$('ai-key').value.trim();
+    inp.readOnly = has || locked;
+    inp.classList.toggle('locked', has || locked);
+    if (locked) inp.value = '';
+    inp.placeholder = locked ? '잠금 저장됨 · 지문·얼굴·PIN으로 해제' : '공급자에서 발급받은 API 키';
+    btn.textContent = locked ? '해제' : has ? '수정' : '저장';
+    btn.classList.toggle('primary', !has);
+    btn.disabled = !has && !locked && !inp.value.trim();
   }
   function editKey() {
-    $('ai-key').readOnly = false;
-    $('ai-key').classList.remove('locked');
+    const inp = $('ai-key');
+    inp.dataset.editing = '1';
+    inp.readOnly = false;
+    inp.classList.remove('locked');
+    if (gasRelay) { inp.value = ''; inp.placeholder = '새 API 키'; }
     $('ai-key-btn').textContent = '저장';
     $('ai-key-btn').classList.add('primary');
-    $('ai-key-btn').disabled = false;
-    $('ai-key').focus();
-    $('ai-key').select();
+    $('ai-key-btn').disabled = !!gasRelay;
+    inp.focus();
+    inp.select();
   }
-  function commitKey() {
-    const v = $('ai-key').value.trim();
-    if (!v) { if (aiKey) { $('ai-key').value = aiKey; } syncKeyUi(); return; }
+  function cancelEdit() {
+    const inp = $('ai-key');
+    delete inp.dataset.editing;
+    if (!gasRelay && aiKey) inp.value = aiKey;
+    syncKeyUi();
+  }
+  async function commitKey() {
+    const inp = $('ai-key');
+    const v = inp.value.trim();
+    if (gasRelay) {
+      if (!v) { cancelEdit(); return; }
+      msgTo('ai-set-msg', '웹 앱에 저장하는 중입니다.');
+      try {
+        await gasSetKey(v);
+        delete inp.dataset.editing;
+        inp.value = '';
+        syncKeyUi();
+        syncAiFab();
+        if ($('ai-log').querySelector('.ai-hello-warn')) aiReset();
+        msgTo('ai-set-msg', '인증 키를 웹 앱에 저장하였습니다.' + (state.source ? ' 왼쪽 아래 단추로 분석 파트너를 엽니다.' : ''), 'ok');
+      } catch (e) { msgTo('ai-set-msg', e.message, 'error'); }
+      return;
+    }
+    if (!v) { cancelEdit(); return; }
     const changed = v !== aiKey;
+    delete inp.dataset.editing;
     aiKey = v;
     keepKey();
     syncKeyUi();
     syncAiFab();
     if ($('ai-log').querySelector('.ai-hello-warn')) aiReset();
-    if (changed) msgTo('ai-set-msg', '인증 키를 저장하였습니다. ' + ($('ai-key-keep').checked ? '이 탭을 닫으면 삭제됩니다.' : '페이지를 닫거나 새로 고치면 삭제됩니다.') + (state.source ? ' 왼쪽 아래 단추로 분석 파트너를 엽니다.' : ''), 'ok');
+    const tail = state.source ? ' 왼쪽 아래 단추로 분석 파트너를 엽니다.' : '';
+    if (keepMode === 'device' && (changed || !lockFor(aiCfg.provider))) {
+      msgTo('ai-set-msg', '지문·얼굴·PIN으로 확인하십시오.');
+      try { await lockKey(v); msgTo('ai-set-msg', '인증 키를 이 기기에 잠금 저장하였습니다. ' + LOCK_DAYS + '일 후 자동 삭제됩니다.' + tail, 'ok'); }
+      catch (e) { msgTo('ai-set-msg', lockErr(e) + ' 지금은 이 페이지를 닫을 때까지만 사용합니다.', 'error'); }
+      renderKeep();
+      return;
+    }
+    if (changed) msgTo('ai-set-msg', '인증 키를 저장하였습니다. ' + (keepMode === 'tab' ? '이 탭을 닫으면 삭제됩니다.' : keepMode === 'device' ? '' : '페이지를 닫거나 새로 고치면 삭제됩니다.') + tail, 'ok');
+  }
+  function onKeyBtn() {
+    const inp = $('ai-key');
+    if (!gasRelay && aiLocked()) { doUnlock(); return; }
+    if (inp.readOnly) editKey(); else commitKey();
   }
   // 입력만 하고 저장하지 않은 키는 대화 열기·모델 목록을 누를 때 함께 반영
-  function pendingKey() { if (!$('ai-key').readOnly && $('ai-key').value.trim()) commitKey(); }
+  function pendingKey() { if (!gasRelay && !$('ai-key').readOnly && $('ai-key').value.trim()) commitKey(); }
   function restoreKey() {
+    const k = store.get('aikeep');
+    keepMode = ['none', 'tab', 'device'].includes(k) ? k : 'none';
+    if (lockRec()) keepMode = 'device';
     try {
       const o = JSON.parse(window.sessionStorage.getItem(KEY_SS) || 'null');
-      if (o && o.p === aiCfg.provider && typeof o.k === 'string') { aiKey = o.k; $('ai-key').value = o.k; $('ai-key-keep').checked = true; }
+      if (o && o.p === aiCfg.provider && typeof o.k === 'string') { aiKey = o.k; $('ai-key').value = o.k; if (keepMode !== 'device') keepMode = 'tab'; }
     } catch (e) { /* 무시 */ }
     syncKeyUi();
+    renderKeep();
+    detectPrf().then((c) => { if (prfCap === null) prfCap = c; renderKeep(); });
+  }
+  // 공급자를 바꾸거나 초기화할 때
+  function dropKey() {
+    aiKey = '';
+    const inp = $('ai-key');
+    inp.value = '';
+    delete inp.dataset.editing;
+    setSession(false);
+    syncKeyUi();
+    renderKeep();
+  }
+  function aiKeyReset() {
+    try { window.sessionStorage.removeItem(KEY_SS); } catch (e) { /* 무시 */ }
+    keepMode = 'none';
+    dropKey();
+  }
+
+  // ── 웹 앱 중계 (Apps Script: duruboardAiStatus · duruboardAiSetKey · duruboardAi) ──
+  function gasCall(fn, args, ms) {
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const timer = setTimeout(() => { if (!done) { done = true; reject(Object.assign(new Error('timeout'), { name: 'AbortError' })); } }, ms || 30000);
+      const r = window.google.script.run
+        .withSuccessHandler((v) => { if (done) return; done = true; clearTimeout(timer); resolve(v); })
+        .withFailureHandler((e) => { if (done) return; done = true; clearTimeout(timer); reject(new Error(e && e.message ? String(e.message).slice(0, 200) : '웹 앱 오류')); });
+      r[fn].apply(r, args || []);
+    });
+  }
+  function gasStatus(v) {
+    let o = v;
+    if (typeof v === 'string') { try { o = JSON.parse(v); } catch (e) { o = null; } }
+    if (!o || !o.saved || typeof o.saved !== 'object') return null;
+    const saved = {};
+    Object.keys(AI_PROVIDERS).forEach((id) => { saved[id] = !!o.saved[id]; });
+    return { saved };
+  }
+  async function initGasRelay() {
+    if (!EMBED) return;
+    try {
+      const s = gasStatus(await gasCall('duruboardAiStatus', [], 20000));
+      if (!s) return;
+      gasRelay = s;
+      aiKey = '';
+      setSession(false);
+      syncKeyUi();
+      renderKeep();
+      syncAiFab();
+    } catch (e) { /* 중계 함수가 없으면 이 화면에서 키를 입력하는 방식 사용 */ }
+  }
+  async function gasSetKey(key) {
+    let v;
+    try { v = await gasCall('duruboardAiSetKey', [aiCfg.provider, key], 30000); }
+    catch (e) { throw new Error('웹 앱에 저장하지 못하였습니다. (' + e.message + ')'); }
+    const s = gasStatus(v);
+    if (s) gasRelay = s;
+  }
+  async function gasDelKey() {
+    const ok = await askConfirm(aiProv().label + ' 인증 키를 웹 앱에서 삭제합니다. 이 웹 앱을 쓰는 다른 교사도 분석 파트너를 사용할 수 없게 됩니다.', { ok: '삭제', danger: true });
+    if (!ok) return;
+    try {
+      await gasSetKey('');
+      syncKeyUi();
+      syncAiFab();
+      msgTo('ai-set-msg', '웹 앱에서 인증 키를 삭제하였습니다.', 'ok');
+    } catch (e) { msgTo('ai-set-msg', e.message, 'error'); }
   }
 
   // ── 열별 전송 방식 ──
@@ -4711,6 +4990,30 @@
     aiAbort = { abort() { rej(Object.assign(new Error('abort'), { name: 'AbortError' })); } };
     return Promise.race([fetch(url, Object.assign({ credentials: 'omit', referrerPolicy: 'no-referrer' }, opt)), stop]).finally(() => clearTimeout(timer));
   }
+  function authHead(p) {
+    return p.api === 'ant' ? { 'x-api-key': aiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
+      : p.api === 'gem' ? { 'x-goog-api-key': aiKey } : { Authorization: 'Bearer ' + aiKey };
+  }
+  // 공급자 요청: 웹 앱 중계가 있으면 웹 앱이 저장된 키로 대신 보내고, 없으면 이 브라우저에서 직접 보냄
+  function aiReq(url, body) {
+    if (gasRelay) return gasAi(url, body);
+    const h = Object.assign(body ? { 'Content-Type': 'application/json' } : {}, authHead(aiProv()));
+    return aiFetch(url, body ? { method: 'POST', headers: h, body } : { headers: h });
+  }
+  function gasAi(url, body) {
+    let timer, rej;
+    const stop = new Promise((_, r) => { rej = r; timer = setTimeout(() => r(Object.assign(new Error('timeout'), { name: 'AbortError' })), AI_TIMEOUT_MS); });
+    stop.catch(() => {});
+    aiAbort = { abort() { rej(Object.assign(new Error('abort'), { name: 'AbortError' })); } };
+    const call = gasCall('duruboardAi', [JSON.stringify({ provider: aiCfg.provider, url, method: body ? 'post' : 'get', body: body || '' })], AI_TIMEOUT_MS + 5000)
+      .then((v) => {
+        let o = v;
+        if (typeof v === 'string') { try { o = JSON.parse(v); } catch (e) { o = null; } }
+        if (!o || typeof o.status !== 'number') throw new Error('웹 앱의 응답을 해석하지 못하였습니다.');
+        return { ok: o.status >= 200 && o.status < 300, status: o.status, json: async () => JSON.parse(String(o.body || '')) };
+      }, (e) => { if (e.name === 'AbortError') throw e; throw new Error('웹 앱을 통한 AI 요청에 실패하였습니다. (' + e.message + ')'); });
+    return Promise.race([call, stop]).finally(() => clearTimeout(timer));
+  }
   async function aiJson(res) {
     let body = null;
     try { body = await res.json(); } catch (e) { body = null; }
@@ -4749,11 +5052,7 @@
           messages.push(o);
         } else m.results.forEach((r) => messages.push({ role: 'tool', tool_call_id: r.id, content: r.content }));
       });
-      const res = await aiFetch(p.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + aiKey },
-        body: JSON.stringify({ model, messages, tools: AI_TOOLS.map((t) => ({ type: 'function', function: t })) })
-      });
+      const res = await aiReq(p.url, JSON.stringify({ model, messages, tools: AI_TOOLS.map((t) => ({ type: 'function', function: t })) }));
       const j = await aiJson(res);
       const msg = (j.choices && j.choices[0] && j.choices[0].message) || {};
       const calls = (msg.tool_calls || []).filter((c) => c.function).map((c) => {
@@ -4772,11 +5071,7 @@
           messages.push({ role: 'assistant', content: content.length ? content : [{ type: 'text', text: '…' }] });
         } else messages.push({ role: 'user', content: m.results.map((r) => ({ type: 'tool_result', tool_use_id: r.id, content: r.content })) });
       });
-      const res = await aiFetch(p.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': aiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-        body: JSON.stringify({ model, max_tokens: 4096, system: sys, messages, tools: AI_TOOLS.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) })
-      });
+      const res = await aiReq(p.url, JSON.stringify({ model, max_tokens: 4096, system: sys, messages, tools: AI_TOOLS.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) }));
       const j = await aiJson(res);
       const blocks = Array.isArray(j.content) ? j.content : [];
       return {
@@ -4796,11 +5091,7 @@
         contents.push({ role: 'user', parts: m.results.map((r) => { let resp; try { resp = JSON.parse(r.content); } catch (e) { resp = { result: r.content }; } const fr = { name: r.name, response: { result: resp } }; if (r.gid) fr.id = r.gid; return { functionResponse: fr }; }) });
       }
     });
-    const res = await aiFetch(p.url + encodeURIComponent(model) + ':generateContent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': aiKey },
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: sys }] }, contents, tools: [{ functionDeclarations: AI_TOOLS.map((t) => ({ name: t.name, description: t.description, parameters: geminiSchema(t.parameters) })) }] })
-    });
+    const res = await aiReq(p.url + encodeURIComponent(model) + ':generateContent', JSON.stringify({ systemInstruction: { parts: [{ text: sys }] }, contents, tools: [{ functionDeclarations: AI_TOOLS.map((t) => ({ name: t.name, description: t.description, parameters: geminiSchema(t.parameters) })) }] }));
     const j = await aiJson(res);
     const cand = j.candidates && j.candidates[0];
     if (!cand) throw new Error('응답이 비어 있습니다.' + (j.promptFeedback && j.promptFeedback.blockReason ? ' (차단 사유: ' + j.promptFeedback.blockReason + ')' : ''));
@@ -4813,9 +5104,9 @@
   }
 
   // ── 대화 화면 ──
-  function aiReady() { return !!aiKey; }
+  function aiReady() { return gasRelay ? !!gasRelay.saved[aiCfg.provider] : !!aiKey; }
   // 분석 파트너 단추: 자료를 연결하고 인증 키를 입력한 경우에만 왼쪽 아래에 표시
-  function syncAiFab() { $('btn-ai').hidden = !(state.source && aiKey); }
+  function syncAiFab() { $('btn-ai').hidden = !(state.source && (aiReady() || aiLocked())); }
   function aiScroll() { const l = $('ai-log'); l.scrollTop = l.scrollHeight; }
   // 가명(ID-07 등)을 원래 값으로 복원하여 표시
   // 가명(ID-07 등)을 찾아 표시 요소로 바꿈. 모델이 다른 붙임표(‐‑–—−)나 자릿수를 쓰더라도 인식
@@ -5065,6 +5356,7 @@
     text = String(text || '').trim();
     if (!text || aiBusy) return;
     if (!state.source) { aiErr('자료를 먼저 연결하십시오.'); return; }
+    if (!aiReady() && aiLocked()) { try { await unlockKey(); } catch (e) { aiErr(lockErr(e)); return; } }
     if (!aiReady()) { aiErr('레이아웃 설정 › 분석 파트너에서 인증 키를 입력하십시오.'); return; }
     if (!aiIsConfirmed()) { aiGate(); return; }
     $('ai-in').value = '';
@@ -5131,7 +5423,14 @@
     const t = el('p', 'ai-hello-t', '무엇을 도와드릴까요?');
     const d = el('p', null, '자료에 대해 질문하거나, 보드에 추가할 그래프·표·통계를 요청하십시오. 자료는 열별 전송 설정에 따라 필요한 만큼만 전송합니다.');
     hi.append(t, d);
-    if (!aiReady()) {
+    if (!aiReady() && aiLocked()) {
+      const w = el('p', 'ai-hello-warn', '인증 키가 이 기기에 잠금 저장되어 있습니다. ');
+      const go = el('button', 'link', '잠금 해제 ›');
+      go.type = 'button';
+      go.addEventListener('click', async () => { try { await unlockKey(); } catch (e) { aiErr(lockErr(e)); } });
+      w.append(go);
+      hi.append(w);
+    } else if (!aiReady()) {
       const w = el('p', 'ai-hello-warn', '인증 키가 입력되지 않았습니다. ');
       const go = el('button', 'link', '설정 열기 ›');
       go.type = 'button';
@@ -5290,10 +5589,7 @@
       b.addEventListener('click', () => {
         if (aiCfg.provider === id) return;
         aiCfg = { provider: id, model: '' };
-        aiKey = '';
-        $('ai-key').value = '';
-        keepKey();
-        syncKeyUi();
+        dropKey();
         syncAiFab();
         saveAiCfg();
         renderAiSettings();
@@ -5309,12 +5605,10 @@
   async function loadModelList() {
     pendingKey();
     const p = aiProv();
-    if (!aiKey) { msgTo('ai-set-msg', '인증 키를 먼저 입력하십시오.', 'error'); $('ai-key').focus(); return; }
+    if (!aiReady()) { msgTo('ai-set-msg', aiLocked() ? '[해제]를 눌러 인증 키 잠금을 먼저 해제하십시오.' : '인증 키를 먼저 입력하십시오.', 'error'); $('ai-key').focus(); return; }
     msgTo('ai-set-msg', '모델 목록을 불러오는 중입니다.');
     try {
-      const h = p.api === 'ant' ? { 'x-api-key': aiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
-        : p.api === 'gem' ? { 'x-goog-api-key': aiKey } : { Authorization: 'Bearer ' + aiKey };
-      const j = await aiJson(await aiFetch(p.list, { headers: h }));
+      const j = await aiJson(await aiReq(p.list, null));
       let ids = [];
       if (Array.isArray(j.data)) ids = j.data.map((m) => m.id).filter((x) => typeof x === 'string');
       else if (Array.isArray(j.models)) ids = j.models.filter((m) => !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent')).map((m) => String(m.name || '').replace(/^models\//, '')).filter(Boolean);
@@ -5349,17 +5643,25 @@
     renderAiSettings();
     $('ai-model').addEventListener('change', () => { aiCfg.model = $('ai-model').value.trim().slice(0, 100); saveAiCfg(); });
     // 인증 키: 저장된 상태에서는 읽기 전용, [수정]을 눌러야 변경 → [저장](또는 Enter)으로 반영, Esc는 취소
-    $('ai-key-btn').addEventListener('click', () => { if ($('ai-key').readOnly) editKey(); else commitKey(); });
+    $('ai-key-btn').addEventListener('click', onKeyBtn);
     $('ai-key').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); commitKey(); }
-      else if (e.key === 'Escape' && aiKey) { e.stopPropagation(); $('ai-key').value = aiKey; syncKeyUi(); }
+      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (!$('ai-key').readOnly) commitKey(); }
+      else if (e.key === 'Escape' && $('ai-key').dataset.editing === '1') { e.stopPropagation(); cancelEdit(); }
     });
     $('ai-key').addEventListener('input', () => { $('ai-key-btn').disabled = !$('ai-key').value.trim(); });
-    $('ai-key-keep').addEventListener('change', keepKey);
+    $('ai-keep').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => setKeep(b.dataset.v)));
+    $('ai-key-del').addEventListener('click', gasDelKey);
     restoreKey();
+    initGasRelay();
     $('ai-models').addEventListener('click', loadModelList);
     $('ai-cols').addEventListener('click', openAiCols);
-    $('btn-ai').addEventListener('click', () => openAi(true));
+    $('btn-ai').addEventListener('click', async () => {
+      // 잠금 저장된 키는 단추를 누를 때 지문·얼굴·PIN으로 해제
+      if (aiLocked() && !$('dlg-ai').open) {
+        try { await unlockKey(); } catch (e) { openAi(true); aiErr(lockErr(e)); return; }
+      }
+      openAi(true);
+    });
     $('ai-close').addEventListener('click', () => $('dlg-ai').close());
     $('dlg-ai').addEventListener('close', () => { if (aiAbort) aiAbort.abort(); if (aiPendingConfirm) aiPendingConfirm('cancel'); if (!$('dlg-ai').open && document.documentElement.classList.contains('ai-docked')) applyDock(false); });
     $('dlg-ai').addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('dlg-ai').classList.contains('dock')) $('dlg-ai').close(); });

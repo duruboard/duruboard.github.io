@@ -9,7 +9,7 @@
         content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https: http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>두루보드</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2048%2048%22%3E%3Crect%20x%3D%224%22%20y%3D%2222%22%20width%3D%2211%22%20height%3D%2222%22%20rx%3D%225.5%22%20fill%3D%22%23c6cdff%22/%3E%3Crect%20x%3D%2217%22%20y%3D%227%22%20width%3D%2214%22%20height%3D%2237%22%20rx%3D%227%22%20fill%3D%22%239ea6fc%22/%3E%3Crect%20x%3D%2233%22%20y%3D%2215%22%20width%3D%2211%22%20height%3D%2229%22%20rx%3D%225.5%22%20fill%3D%22%23c4b5fd%22/%3E%3Ccircle%20cx%3D%2221.6%22%20cy%3D%2219%22%20r%3D%221.7%22%20fill%3D%22%233d2280%22/%3E%3Ccircle%20cx%3D%2226.4%22%20cy%3D%2219%22%20r%3D%221.7%22%20fill%3D%22%233d2280%22/%3E%3Cpath%20d%3D%22M22.2%2022.4q1.8%201.8%203.6%200%22%20fill%3D%22none%22%20stroke%3D%22%233d2280%22%20stroke-width%3D%221.4%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="style.css?v=20261102c">
+  <link rel="stylesheet" href="style.css?v=20261110a">
 </head>
 <body>
   <header class="app-header">
@@ -95,7 +95,7 @@
     </section>
     <section class="pop-sec ai-sec">
       <div class="ai-sec-head"><h2>분석 파트너</h2><span class="ai-badge">AI</span></div>
-      <p class="hint">외부 AI 모델을 연결하여 자료에 대해 질문하고 개체 제안을 받습니다. 인증 키는 저장하지 않으며 페이지를 닫으면 삭제됩니다.</p>
+      <p class="hint">외부 AI 모델을 연결하여 자료에 대해 질문하고 개체 제안을 받습니다. 인증 키는 레이아웃 내보내기에 포함되지 않습니다.</p>
       <div class="ai-field">
         <span class="field-label">공급자</span>
         <div id="ai-prov" class="seg-theme ai-prov" role="radiogroup" aria-label="공급자"></div>
@@ -113,12 +113,19 @@
         <span class="ai-model-row">
           <input id="ai-key" type="password" spellcheck="false" autocomplete="off" placeholder="공급자에서 발급받은 API 키">
           <button type="button" id="ai-key-btn" class="btn small">저장</button>
+          <button type="button" id="ai-key-del" class="btn small" hidden>삭제</button>
         </span>
+        <p id="ai-key-hint" class="hint"></p>
       </div>
-      <label class="check ai-keep">
-        <input id="ai-key-keep" type="checkbox">
-        <span>이 탭을 닫을 때까지 유지 <small>(새로 고침해도 다시 입력하지 않음. 레이아웃 내보내기에는 포함되지 않음)</small></span>
-      </label>
+      <div class="ai-field" id="ai-keep-field">
+        <span class="field-label">인증 키 보관</span>
+        <div id="ai-keep" class="seg-theme ai-keep-seg" role="radiogroup" aria-label="인증 키 보관">
+          <button type="button" role="radio" data-v="none" aria-checked="true">저장 안 함</button>
+          <button type="button" role="radio" data-v="tab" aria-checked="false">이 탭 동안</button>
+          <button type="button" role="radio" data-v="device" aria-checked="false">기기에 잠금 저장</button>
+        </div>
+        <p id="ai-keep-note" class="hint"></p>
+      </div>
       <div class="ai-field">
         <span class="field-label">전송 자료</span>
         <div class="ai-send-row">
@@ -236,7 +243,7 @@
   </main>
 
   <footer class="app-footer">
-    <p>두루보드는 받은 자료를 이 브라우저 화면에 표시하는 데에만 사용하며, 자료와 인증코드를 저장하지 않습니다. 분석 파트너를 사용하는 경우에만 교사가 정한 범위의 자료를 선택한 AI 공급자에게 전송합니다.</p>
+    <p>두루보드는 받은 자료를 이 브라우저 화면에 표시하는 데에만 사용하며, 자료와 인증코드를 저장하지 않습니다. 분석 파트너를 사용하는 경우에만 교사가 정한 범위의 자료를 선택한 AI 공급자에게 전송하며, AI 인증 키는 교사가 고른 보관 방식에 따라서만 보관합니다.</p>
   </footer>
 
   <!-- 그래프 만들기 -->
@@ -550,7 +557,7 @@
         <dt>요청 주소</dt><dd><code id="se-src"></code></dd>
         <dt>올바른 형식</dt><dd><code>{ "rows": [ { "학번": "30101", "1단원": "완료" }, … ] }</code></dd>
       </dl>
-      <p class="spec-foot">서버 담당자에게 위 내용을 전달하십시오. 자세한 규격은 <a href="https://duruboard.github.io/API_SPEC.md" target="_blank" rel="noopener noreferrer">두루보드 자료 제공 규격</a>에 있습니다.</p>
+      <p class="spec-foot">서버 담당자에게 위 내용을 전달하십시오. 자세한 규격은 docs/API_SPEC.md에 있습니다.</p>
       <div class="dialog-actions">
         <button type="button" id="se-ok" class="btn primary">확인</button>
       </div>
@@ -653,6 +660,6 @@
   </dialog>
 
   <script src="vendor/chart.umd.js"></script>
-  <script src="app.js?v=20261102c"></script>
+  <script src="app.js?v=20261110a"></script>
 </body>
 </html>

@@ -21,7 +21,8 @@
 2. 인증코드(1장·3장 나 방식): 관리자가 발급·폐기할 수 있게 하고, 원문은 저장하지 않고 해시로만 보관합니다. 인증코드마다 응답할 표(범위)를 정할 수 있게 합니다.
 3. 응답: 2장 형식(`meta`·`columns`·`rows`)을 따릅니다. 요청 한 번에 표 하나, 값은 숫자·문자·true/false·null만 사용합니다. 제출 여부는 1/0, 점수는 숫자, 미제출·미응시는 null로 표현합니다.
 4. 제한과 오류: 응답 20MB·50,000행 이하, 요청이 너무 많으면 429. 오류 응답에 개인정보나 내부 정보를 넣지 않습니다.
-5. 연결 안내: 인증코드를 발급하면 4장의 '두루보드 연결 정보'를 한 번 표시합니다. '웹 앱 안에서 열기'는 인증코드가 없으므로, 두루보드를 여는 주소(예: `…/exec?view=duruboard`)와 볼 수 있는 계정 목록을 교사에게 알려 줍니다.
+5. 분석 파트너 인증 키(Apps Script 가 방식): 3장의 '다. 분석 파트너 인증 키 중계' 함수 세 개(`duruboardAiStatus`·`duruboardAiSetKey`·`duruboardAi`)도 같은 `.gs` 파일에 넣습니다. 교사에게 따로 묻지 않고 기본으로 넣습니다.
+6. 연결 안내: 인증코드를 발급하면 4장의 '두루보드 연결 정보'를 한 번 표시합니다. '웹 앱 안에서 열기'는 인증코드가 없으므로, 두루보드를 여는 주소(예: `…/exec?view=duruboard`)와 볼 수 있는 계정 목록을 교사에게 알려 줍니다.
 
 **Apps Script로 구현할 때 코드 제공 방식**
 
@@ -43,11 +44,12 @@
   4. 두루보드 화면에서 [불러오기]를 누릅니다.
   5. 오른쪽 아래 [개체]로 그래프·표·통계를 추가하고, 레이아웃 설정에서 레이아웃을 저장하거나 내보냅니다.
   6. 자주 쓰면 3번 주소를 브라우저 즐겨찾기에 추가합니다.
+  7. (분석 파트너를 쓸 경우) 오른쪽 위 레이아웃 설정 › 분석 파트너에서 공급자를 고르고 인증 키를 입력한 뒤 [저장]을 누릅니다. 키는 웹 앱(스크립트 속성)에 보관되어 다음부터 어느 기기에서나 다시 입력하지 않습니다.
 
   일반 서버(1장) 또는 Apps Script 나. 인증코드 방식
   1. 변경한 코드를 서버에 반영(배포)합니다. (반영 방법을 이 시스템 기준으로 구체적으로 적습니다.)
   2. 인증코드를 발급합니다. (실행할 명령 또는 함수와 누를 메뉴를 적습니다.) 화면에 나온 '두루보드 연결 정보'를 따로 기록합니다. 인증코드는 이때 한 번만 보입니다.
-  3. 두루보드(`https://duruboard.github.io/`)를 엽니다.
+  3. 두루보드(`https://dinosinfolee.github.io/toy/duruboard/`)를 엽니다.
   4. '도메인 또는 웹 앱 주소' 칸과 '인증코드' 칸에 2번에서 기록한 값을 입력하고 [조회]를 누릅니다.
   5. 오른쪽 아래 [개체]로 그래프·표·통계를 추가하고, 레이아웃 설정에서 레이아웃을 저장하거나 내보냅니다.
   6. 인증코드가 유출되었거나 더 이상 쓰지 않으면 폐기합니다. (폐기 방법을 적습니다.)
@@ -122,7 +124,7 @@ Google Apps Script 웹 앱은 요청 머리글(`Authorization`)을 읽을 수 �
 
 웹 앱이 GitHub에 게시된 두루보드 화면을 불러와 자기 화면으로 보여 줍니다. 두루보드는 이 경우를 스스로 알아채고(`google.script.run` 존재), 주소·인증코드 입력 없이 [불러오기]를 누르면 웹 앱의 `duruboardData()` 함수를 호출하여 자료를 받습니다. 다른 사이트로 요청하지 않으므로 학교 계정 로그인이 그대로 적용됩니다.
 
-- 두루보드 게시 주소: `https://duruboard.github.io/` (`index.html`, `app.js`, `style.css`, `vendor/chart.umd.js`)
+- 두루보드 게시 주소: `https://dinosinfolee.github.io/toy/duruboard/` (`index.html`, `app.js`, `style.css`, `vendor/chart.umd.js`)
 - 웹 앱이 제공할 것
   1. `doGet`: `view=duruboard`이면 허용 계정인지 확인한 뒤 두루보드 화면을 응답합니다. 그 밖의 요청은 기존 화면을 그대로 응답합니다.
   - 위 코드는 `.gs` 파일 하나(예: `Duruboard.gs`)에 모두 넣습니다(0장 '코드 제공 방식' 참고).
@@ -131,7 +133,7 @@ Google Apps Script 웹 앱은 요청 머리글(`Authorization`)을 읽을 수 �
 - 배포는 바꾸지 않습니다. 실행 계정 '나', 액세스는 기존대로(예: 학교 도메인) 둡니다.
 
 ```javascript
-const DURU_BASE = 'https://duruboard.github.io/';
+const DURU_BASE = 'https://dinosinfolee.github.io/toy/duruboard/';
 const DURU_ALLOWED = ['teacher@school.kr'];   // 두루보드를 볼 수 있는 계정
 
 function doGet(e) {
@@ -231,6 +233,61 @@ function json(obj) {
   - 기존 `doPost`가 있으면, 본문의 `api`가 `"duruboard/v1"`일 때만 두루보드 응답으로 보내고 나머지는 기존 처리를 그대로 따릅니다. 기존 처리에도 위와 같은 학교 계정 확인을 넣습니다.
 - 인증코드가 틀린 요청이 짧은 시간에 반복되면(예: 10분에 10회) `CacheService`로 기록하여 잠시 `{"error":{"status":429}}`로 거부합니다.
 - 교사가 할 일은 [배포] → [새 배포] → 웹 앱, 액세스 '모든 사용자'로 배포하고, 발급 함수를 한 번 실행하는 것뿐이 되도록 구현합니다.
+
+### 다. 분석 파트너 인증 키 중계 (가 방식에서 사용)
+
+가 방식에서는 분석 파트너의 AI 인증 키를 웹 앱의 **스크립트 속성**에 보관하고, AI 요청도 웹 앱이 대신 보냅니다. 키는 교사 화면(브라우저)으로 전달되지 않으며, 볼 수 있는 사람은 스크립트 편집 권한자뿐입니다. 두루보드는 아래 함수가 있으면 스스로 이 방식을 사용하고, 없으면 화면에서 키를 입력하는 방식으로 동작합니다.
+
+- `duruboardAiStatus()`: 공급자별 키 저장 여부만 돌려줍니다(키 값은 돌려주지 않음).
+- `duruboardAiSetKey(provider, key)`: 키를 저장합니다. 빈 값이면 삭제합니다.
+- `duruboardAi(req)`: 두루보드가 만든 요청(`provider`·`url`·`method`·`body`)에 저장된 키를 붙여 공급자에 보내고 `{ status, body }`를 돌려줍니다. **요청 주소는 아래 4개 공급자 주소로 시작하는 경우에만** 보냅니다.
+- 세 함수 모두 허용 계정인지 먼저 확인합니다(가 방식의 `duruAllowed()` 사용).
+
+```javascript
+const DURU_AI = {
+  openai:    { base: 'https://api.openai.com/v1/',                       head: (k) => ({ Authorization: 'Bearer ' + k }) },
+  anthropic: { base: 'https://api.anthropic.com/v1/',                    head: (k) => ({ 'x-api-key': k, 'anthropic-version': '2023-06-01' }) },
+  gemini:    { base: 'https://generativelanguage.googleapis.com/v1beta/', head: (k) => ({ 'x-goog-api-key': k }) },
+  upstage:   { base: 'https://api.upstage.ai/v1/',                       head: (k) => ({ Authorization: 'Bearer ' + k }) }
+};
+
+function duruboardAiStatus() {
+  if (!duruAllowed()) throw new Error('두루보드를 볼 권한이 없습니다.');
+  const props = PropertiesService.getScriptProperties();
+  const saved = {};
+  Object.keys(DURU_AI).forEach((id) => { saved[id] = !!props.getProperty('DURU_AI_KEY_' + id); });
+  return JSON.stringify({ relay: 1, saved: saved });
+}
+
+function duruboardAiSetKey(provider, key) {
+  if (!duruAllowed()) throw new Error('두루보드를 볼 권한이 없습니다.');
+  if (!DURU_AI[provider]) throw new Error('지원하지 않는 공급자입니다.');
+  key = String(key || '').trim();
+  if (key.length > 500) throw new Error('인증 키가 너무 깁니다.');
+  const props = PropertiesService.getScriptProperties();
+  if (key) props.setProperty('DURU_AI_KEY_' + provider, key);
+  else props.deleteProperty('DURU_AI_KEY_' + provider);
+  return duruboardAiStatus();
+}
+
+function duruboardAi(reqText) {
+  if (!duruAllowed()) throw new Error('두루보드를 볼 권한이 없습니다.');
+  const req = JSON.parse(reqText);
+  const conf = DURU_AI[req.provider];
+  if (!conf) throw new Error('지원하지 않는 공급자입니다.');
+  if (typeof req.url !== 'string' || req.url.indexOf(conf.base) !== 0) throw new Error('허용되지 않은 요청 주소입니다.');
+  const key = PropertiesService.getScriptProperties().getProperty('DURU_AI_KEY_' + req.provider);
+  if (!key) throw new Error('인증 키가 저장되어 있지 않습니다.');
+  const opt = { method: req.method === 'get' ? 'get' : 'post', headers: conf.head(key), muteHttpExceptions: true };
+  if (opt.method === 'post') { opt.contentType = 'application/json'; opt.payload = String(req.body || ''); }
+  const res = UrlFetchApp.fetch(req.url, opt);
+  return JSON.stringify({ status: res.getResponseCode(), body: res.getContentText('UTF-8') });
+}
+```
+
+- 키는 두루보드 설정 화면에서 입력하는 것이 기본입니다. 편집기의 [프로젝트 설정] → [스크립트 속성]에서 `DURU_AI_KEY_openai`처럼 직접 추가해도 됩니다.
+- 허용 계정이면 누구나 이 키로 분석 파트너를 쓸 수 있습니다. 두루보드 전용 키를 발급하고 공급자 화면에서 사용 한도를 설정하도록 교사에게 안내하십시오.
+- 오류 응답 본문에는 키가 들어가지 않습니다. 실행 기록(`console.log`)에 키나 요청 본문을 남기지 마십시오.
 
 ## 4. 인증코드 발급과 연결 안내 (1장·3장 나 방식)
 
