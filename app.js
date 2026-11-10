@@ -4419,10 +4419,10 @@
     return true;
   }
   async function doUnlock() {
-    msgTo('ai-set-msg', '지문·얼굴·PIN으로 잠금을 해제하십시오.');
+    msgTo('ai-key-msg', '지문·얼굴·PIN으로 잠금을 해제하십시오.');
     try {
-      if (await unlockKey()) msgTo('ai-set-msg', '인증 키 잠금을 해제하였습니다. 이 페이지를 닫으면 다시 잠깁니다.', 'ok');
-    } catch (e) { msgTo('ai-set-msg', lockErr(e), 'error'); }
+      if (await unlockKey()) msgTo('ai-key-msg', '인증 키 잠금을 해제하였습니다. 이 페이지를 닫으면 다시 잠깁니다.', 'ok');
+    } catch (e) { msgTo('ai-key-msg', lockErr(e), 'error'); }
   }
   function lockDays() { const o = lockFor(aiCfg.provider); return o ? Math.max(1, Math.ceil((o.exp - Date.now()) / 864e5)) : 0; }
 
@@ -4457,15 +4457,16 @@
     renderKeep();
     syncAiFab();
     if (v === 'device' && aiKey) {
-      msgTo('ai-set-msg', '지문·얼굴·PIN으로 확인하십시오.');
-      try { await lockKey(aiKey); msgTo('ai-set-msg', '인증 키를 이 기기에 잠금 저장하였습니다. ' + LOCK_DAYS + '일 후 자동 삭제됩니다.', 'ok'); }
-      catch (e) { msgTo('ai-set-msg', lockErr(e), 'error'); }
+      msgTo('ai-key-msg', '지문·얼굴·PIN으로 확인하십시오.');
+      try { await lockKey(aiKey); msgTo('ai-key-msg', '인증 키를 이 기기에 잠금 저장하였습니다. ' + LOCK_DAYS + '일 후 자동 삭제됩니다.', 'ok'); }
+      catch (e) { msgTo('ai-key-msg', lockErr(e), 'error'); }
       renderKeep();
-    } else if (v === 'none' && had) msgTo('ai-set-msg', '이 브라우저에 보관한 인증 키를 삭제하였습니다.', 'ok');
-    else msgTo('ai-set-msg', '');
+    } else if (v === 'none' && had) msgTo('ai-key-msg', '이 브라우저에 보관한 인증 키를 삭제하였습니다.', 'ok');
+    else msgTo('ai-key-msg', '');
   }
 
   function syncKeyUi() {
+    syncModelBtn();
     const inp = $('ai-key'), btn = $('ai-key-btn');
     if (gasRelay) {
       const saved = !!gasRelay.saved[aiCfg.provider];
@@ -4491,6 +4492,13 @@
     btn.classList.toggle('primary', !has);
     btn.disabled = !has && !locked && !inp.value.trim();
   }
+  // 모델 목록은 인증 키가 있어야 불러올 수 있으므로, 키를 입력하기 전에는 비활성화
+  function syncModelBtn() {
+    const b = $('ai-models');
+    const ok = aiReady() || aiLocked();
+    b.disabled = !ok;
+    b.title = ok ? '' : '인증 키를 먼저 저장하십시오';
+  }
   function editKey() {
     const inp = $('ai-key');
     inp.dataset.editing = '1';
@@ -4514,7 +4522,7 @@
     const v = inp.value.trim();
     if (gasRelay) {
       if (!v) { cancelEdit(); return; }
-      msgTo('ai-set-msg', '웹 앱에 저장하는 중입니다.');
+      msgTo('ai-key-msg', '웹 앱에 저장하는 중입니다.');
       try {
         await gasSetKey(v);
         delete inp.dataset.editing;
@@ -4522,8 +4530,8 @@
         syncKeyUi();
         syncAiFab();
         if ($('ai-log').querySelector('.ai-hello-warn')) aiReset();
-        msgTo('ai-set-msg', '인증 키를 웹 앱에 저장하였습니다.' + (state.source ? ' 왼쪽 아래 단추로 분석 파트너를 엽니다.' : ''), 'ok');
-      } catch (e) { msgTo('ai-set-msg', e.message, 'error'); }
+        msgTo('ai-key-msg', '인증 키를 웹 앱에 저장하였습니다.' + (state.source ? ' 왼쪽 아래 단추로 분석 파트너를 엽니다.' : ''), 'ok');
+      } catch (e) { msgTo('ai-key-msg', e.message, 'error'); }
       return;
     }
     if (!v) { cancelEdit(); return; }
@@ -4536,13 +4544,13 @@
     if ($('ai-log').querySelector('.ai-hello-warn')) aiReset();
     const tail = state.source ? ' 왼쪽 아래 단추로 분석 파트너를 엽니다.' : '';
     if (keepMode === 'device' && (changed || !lockFor(aiCfg.provider))) {
-      msgTo('ai-set-msg', '지문·얼굴·PIN으로 확인하십시오.');
-      try { await lockKey(v); msgTo('ai-set-msg', '인증 키를 이 기기에 잠금 저장하였습니다. ' + LOCK_DAYS + '일 후 자동 삭제됩니다.' + tail, 'ok'); }
-      catch (e) { msgTo('ai-set-msg', lockErr(e) + ' 지금은 이 페이지를 닫을 때까지만 사용합니다.', 'error'); }
+      msgTo('ai-key-msg', '지문·얼굴·PIN으로 확인하십시오.');
+      try { await lockKey(v); msgTo('ai-key-msg', '인증 키를 이 기기에 잠금 저장하였습니다. ' + LOCK_DAYS + '일 후 자동 삭제됩니다.' + tail, 'ok'); }
+      catch (e) { msgTo('ai-key-msg', lockErr(e) + ' 지금은 이 페이지를 닫을 때까지만 사용합니다.', 'error'); }
       renderKeep();
       return;
     }
-    if (changed) msgTo('ai-set-msg', '인증 키를 저장하였습니다. ' + (keepMode === 'tab' ? '이 탭을 닫으면 삭제됩니다.' : keepMode === 'device' ? '' : '페이지를 닫거나 새로 고치면 삭제됩니다.') + tail, 'ok');
+    if (changed) msgTo('ai-key-msg', '인증 키를 저장하였습니다. ' + (keepMode === 'tab' ? '이 탭을 닫으면 삭제됩니다.' : keepMode === 'device' ? '' : '페이지를 닫거나 새로 고치면 삭제됩니다.') + tail, 'ok');
   }
   function onKeyBtn() {
     const inp = $('ai-key');
@@ -4625,8 +4633,8 @@
       await gasSetKey('');
       syncKeyUi();
       syncAiFab();
-      msgTo('ai-set-msg', '웹 앱에서 인증 키를 삭제하였습니다.', 'ok');
-    } catch (e) { msgTo('ai-set-msg', e.message, 'error'); }
+      msgTo('ai-key-msg', '웹 앱에서 인증 키를 삭제하였습니다.', 'ok');
+    } catch (e) { msgTo('ai-key-msg', e.message, 'error'); }
   }
 
   // ── 열별 전송 방식 ──
@@ -5594,6 +5602,7 @@
         saveAiCfg();
         renderAiSettings();
         msgTo('ai-set-msg', '');
+        msgTo('ai-key-msg', '');
       });
       seg.append(b);
     });
@@ -5605,7 +5614,7 @@
   async function loadModelList() {
     pendingKey();
     const p = aiProv();
-    if (!aiReady()) { msgTo('ai-set-msg', aiLocked() ? '[해제]를 눌러 인증 키 잠금을 먼저 해제하십시오.' : '인증 키를 먼저 입력하십시오.', 'error'); $('ai-key').focus(); return; }
+    if (!aiReady()) { msgTo('ai-key-msg', aiLocked() ? '[해제]를 눌러 인증 키 잠금을 먼저 해제하십시오.' : '인증 키를 먼저 입력하십시오.', 'error'); $('ai-key').focus(); return; }
     msgTo('ai-set-msg', '모델 목록을 불러오는 중입니다.');
     try {
       const j = await aiJson(await aiReq(p.list, null));

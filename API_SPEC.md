@@ -49,7 +49,7 @@
   일반 서버(1장) 또는 Apps Script 나. 인증코드 방식
   1. 변경한 코드를 서버에 반영(배포)합니다. (반영 방법을 이 시스템 기준으로 구체적으로 적습니다.)
   2. 인증코드를 발급합니다. (실행할 명령 또는 함수와 누를 메뉴를 적습니다.) 화면에 나온 '두루보드 연결 정보'를 따로 기록합니다. 인증코드는 이때 한 번만 보입니다.
-  3. 두루보드(`https://dinosinfolee.github.io/toy/duruboard/`)를 엽니다.
+  3. 두루보드(`https://duruboard.github.io/`)를 엽니다.
   4. '도메인 또는 웹 앱 주소' 칸과 '인증코드' 칸에 2번에서 기록한 값을 입력하고 [조회]를 누릅니다.
   5. 오른쪽 아래 [개체]로 그래프·표·통계를 추가하고, 레이아웃 설정에서 레이아웃을 저장하거나 내보냅니다.
   6. 인증코드가 유출되었거나 더 이상 쓰지 않으면 폐기합니다. (폐기 방법을 적습니다.)
@@ -124,7 +124,7 @@ Google Apps Script 웹 앱은 요청 머리글(`Authorization`)을 읽을 수 �
 
 웹 앱이 GitHub에 게시된 두루보드 화면을 불러와 자기 화면으로 보여 줍니다. 두루보드는 이 경우를 스스로 알아채고(`google.script.run` 존재), 주소·인증코드 입력 없이 [불러오기]를 누르면 웹 앱의 `duruboardData()` 함수를 호출하여 자료를 받습니다. 다른 사이트로 요청하지 않으므로 학교 계정 로그인이 그대로 적용됩니다.
 
-- 두루보드 게시 주소: `https://dinosinfolee.github.io/toy/duruboard/` (`index.html`, `app.js`, `style.css`, `vendor/chart.umd.js`)
+- 두루보드 게시 주소: `https://duruboard.github.io/` (`index.html`, `app.js`, `style.css`, `vendor/chart.umd.js`)
 - 웹 앱이 제공할 것
   1. `doGet`: `view=duruboard`이면 허용 계정인지 확인한 뒤 두루보드 화면을 응답합니다. 그 밖의 요청은 기존 화면을 그대로 응답합니다.
   - 위 코드는 `.gs` 파일 하나(예: `Duruboard.gs`)에 모두 넣습니다(0장 '코드 제공 방식' 참고).
@@ -133,7 +133,7 @@ Google Apps Script 웹 앱은 요청 머리글(`Authorization`)을 읽을 수 �
 - 배포는 바꾸지 않습니다. 실행 계정 '나', 액세스는 기존대로(예: 학교 도메인) 둡니다.
 
 ```javascript
-const DURU_BASE = 'https://dinosinfolee.github.io/toy/duruboard/';
+const DURU_BASE = 'https://duruboard.github.io/';
 const DURU_ALLOWED = ['teacher@school.kr'];   // 두루보드를 볼 수 있는 계정
 
 function doGet(e) {
