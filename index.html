@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <!-- 이 페이지의 스크립트는 같은 폴더의 파일만 실행하고, 자료 요청은 HTTPS(및 로컬 시험 주소)로만 보냅니다. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https: http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>두루보드</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2048%2048%22%3E%3Crect%20x%3D%224%22%20y%3D%2222%22%20width%3D%2211%22%20height%3D%2222%22%20rx%3D%225.5%22%20fill%3D%22%23c6cdff%22/%3E%3Crect%20x%3D%2217%22%20y%3D%227%22%20width%3D%2214%22%20height%3D%2237%22%20rx%3D%227%22%20fill%3D%22%239ea6fc%22/%3E%3Crect%20x%3D%2233%22%20y%3D%2215%22%20width%3D%2211%22%20height%3D%2229%22%20rx%3D%225.5%22%20fill%3D%22%23c4b5fd%22/%3E%3Ccircle%20cx%3D%2221.6%22%20cy%3D%2219%22%20r%3D%221.7%22%20fill%3D%22%233d2280%22/%3E%3Ccircle%20cx%3D%2226.4%22%20cy%3D%2219%22%20r%3D%221.7%22%20fill%3D%22%233d2280%22/%3E%3Cpath%20d%3D%22M22.2%2022.4q1.8%201.8%203.6%200%22%20fill%3D%22none%22%20stroke%3D%22%233d2280%22%20stroke-width%3D%221.4%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css?v=20261102c">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
+        <defs>
+          <linearGradient id="bm1" x1="0" y1="0" x2="0" y2="1"><stop class="bm1a" offset="0"/><stop class="bm1b" offset="1"/></linearGradient>
+          <linearGradient id="bm2" x1="0" y1="0" x2="0" y2="1"><stop class="bm2a" offset="0"/><stop class="bm2b" offset="1"/></linearGradient>
+          <linearGradient id="bm3" x1="0" y1="0" x2="0" y2="1"><stop class="bm3a" offset="0"/><stop class="bm3b" offset="1"/></linearGradient>
+        </defs>
+        <rect class="bm-bar1" x="4" y="22" width="11" height="22" rx="5.5"/>
+        <rect class="bm-bar2" x="17" y="7" width="14" height="37" rx="7"/>
+        <rect class="bm-bar3" x="33" y="15" width="11" height="29" rx="5.5"/>
+        <circle class="bm-eye" cx="21.6" cy="19" r="1.7"/>
+        <circle class="bm-eye" cx="26.4" cy="19" r="1.7"/>
+        <circle class="bm-cheek" cx="19.9" cy="22.2" r="1.2"/>
+        <circle class="bm-cheek" cx="28.1" cy="22.2" r="1.2"/>
+        <path class="bm-mouth" d="M22.2 22.4q1.8 1.8 3.6 0"/>
+        <circle class="bm-spark" cx="43" cy="7" r="2"/>
+        <circle class="bm-spark s2" cx="7" cy="14" r="1.5"/>
+      </svg>
+      <div>
+        <h1>두루보드</h1>
+      </div>
+    </div>
+    <!-- 자료를 불러온 뒤 우측 상단에 표시되는 버튼 -->
+    <div id="fabs" class="fabs">
+    <span id="fetched-at" class="fetched" hidden></span>
+    <button type="button" id="btn-refresh" class="fab" hidden aria-label="새로 고침 (자료 다시 조회)" title="새로 고침">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/></svg>
+    </button>
+    <button type="button" id="btn-wipe" class="fab" hidden aria-label="초기화 (보드와 저장 정보 모두 삭제)" title="초기화">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5.2A1.2 1.2 0 0 1 10.7 4h2.6a1.2 1.2 0 0 1 1.2 1.2V7"/><path d="M6.5 7l.8 11.6A1.6 1.6 0 0 0 8.9 20h6.2a1.6 1.6 0 0 0 1.6-1.4L17.5 7"/><path d="M10.3 11v5M13.7 11v5"/></svg>
+    </button>
+    <button type="button" id="btn-groups" class="fab" hidden aria-label="그룹 관리" title="그룹 관리">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A2 2 0 0 1 5 5.5h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M8 12.5h8M8 15.5h5"/></svg>
+    </button>
+    <button type="button" id="fab-export" class="fab" hidden aria-label="레이아웃 설정" title="레이아웃 설정" aria-expanded="false" aria-controls="pop-export">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+    <button type="button" id="fab" class="fab" hidden aria-label="자료 연결 및 요약" title="자료 연결 및 요약" aria-expanded="false" aria-controls="pop">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <ellipse cx="12" cy="6" rx="7" ry="2.6"></ellipse>
+        <path d="M5 6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6"></path>
+        <path d="M5 12v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6"></path>
+      </svg>
+      <span class="fab-dot" aria-hidden="true"></span>
+    </button>
+    </div>
+  </header>
+
+  <div id="pop-scrim" class="pop-scrim" hidden></div>
+  <!-- 레이아웃 창 -->
+  <div id="pop-export" class="pop" role="dialog" aria-label="레이아웃 설정" hidden>
+    <section class="pop-sec">
+      <div class="pop-head">
+        <h2>레이아웃 설정</h2>
+        <button type="button" id="ex-close" class="icon-btn" aria-label="닫기">×</button>
+      </div>
+      <div class="theme-row">
+        <span class="field-label">화면 밝기</span>
+        <div id="theme-seg" class="seg-theme" role="radiogroup" aria-label="화면 밝기">
+          <button type="button" role="radio" data-mode="light" aria-checked="false">밝게</button>
+          <button type="button" role="radio" data-mode="dark" aria-checked="false">어둡게</button>
+          <button type="button" role="radio" data-mode="auto" aria-checked="true">자동</button>
+        </div>
+      </div>
+      <div class="theme-row auto-row">
+        <span class="field-label">자동 새로 고침</span>
+        <div id="auto-seg" class="seg-theme" role="radiogroup" aria-label="자동 새로 고침 간격">
+          <button type="button" role="radio" data-sec="0" aria-checked="true">끔</button>
+          <button type="button" role="radio" data-sec="30" aria-checked="false">30초</button>
+          <button type="button" role="radio" data-sec="60" aria-checked="false">1분</button>
+          <button type="button" role="radio" data-sec="300" aria-checked="false">5분</button>
+        </div>
+      </div>
+      <div class="clr-sec">
+        <div class="clr-head"><span class="field-label">그래프 기본 색상</span><button type="button" id="clr-reset" class="link">기본값으로</button></div>
+        <div class="clr-line"><span class="clr-name">기본 색</span><div id="g-color-base" class="clr-pick" role="radiogroup" aria-label="기본 색"></div></div>
+        <div class="clr-line"><span class="clr-name">강조 색</span><div id="g-color-point" class="clr-pick" role="radiogroup" aria-label="강조 색"></div></div>
+        <p class="hint">강조 색은 최저값·최고값 강조에 쓰입니다. 개체마다 서식 단계에서 따로 정할 수도 있습니다.</p>
+      </div>
+    </section>
+    <section class="pop-sec ai-sec">
+      <div class="ai-sec-head"><h2>분석 파트너</h2><span class="ai-badge">AI</span></div>
+      <p class="hint">외부 AI 모델을 연결하여 자료에 대해 질문하고 개체 제안을 받습니다. 인증 키는 저장하지 않으며 페이지를 닫으면 삭제됩니다.</p>
+      <div class="ai-field">
+        <span class="field-label">공급자</span>
+        <div id="ai-prov" class="seg-theme ai-prov" role="radiogroup" aria-label="공급자"></div>
+      </div>
+      <label class="ai-field">
+        <span class="field-label">모델</span>
+        <span class="ai-model-row">
+          <input id="ai-model" type="text" spellcheck="false" autocomplete="off" aria-label="모델명">
+          <button type="button" id="ai-models" class="btn small">목록</button>
+        </span>
+      </label>
+      <div id="ai-model-list" class="ai-model-list" hidden></div>
+      <div class="ai-field" id="ai-key-field">
+        <label class="field-label" for="ai-key">인증 키</label>
+        <span class="ai-model-row">
+          <input id="ai-key" type="password" spellcheck="false" autocomplete="off" placeholder="공급자에서 발급받은 API 키">
+          <button type="button" id="ai-key-btn" class="btn small">저장</button>
+        </span>
+      </div>
+      <label class="check ai-keep">
+        <input id="ai-key-keep" type="checkbox">
+        <span>이 탭을 닫을 때까지 유지 <small>(새로 고침해도 다시 입력하지 않음. 레이아웃 내보내기에는 포함되지 않음)</small></span>
+      </label>
+      <div class="ai-field">
+        <span class="field-label">전송 자료</span>
+        <div class="ai-send-row">
+          <button type="button" id="ai-cols" class="btn small ai-cols-btn">열별 전송 설정</button>
+          <span id="ai-send-sum" class="ai-send-sum"></span>
+        </div>
+      </div>
+      <p id="ai-set-msg" class="msg" role="status" aria-live="polite"></p>
+    </section>
+    <section class="pop-sec ex-data">
+      <h2>레이아웃 내보내기</h2>
+      <p class="hint">선택한 개체의 구성을 JSON 파일로 저장합니다. 자료 값은 포함되지 않으며, 파일을 공유받은 사용자는 [레이아웃 불러오기]로 적용할 수 있습니다.</p>
+      <div class="mini-actions">
+        <button type="button" id="ex-all" class="link">전체 선택</button>
+        <button type="button" id="ex-none" class="link">선택 해제</button>
+      </div>
+      <ul id="ex-list" class="ex-list"></ul>
+      <label class="check ex-ai">
+        <input id="ex-ai" type="checkbox" checked>
+        <span class="ex-ai-t">분석 파트너 설정 함께 저장
+          <span class="inc-row"><span class="inc-tag yes">포함</span><span class="inc-v">공급자 · 모델 · 열별 전송 설정</span></span>
+          <span class="inc-row"><span class="inc-tag no">미포함</span><span class="inc-v">인증 키</span></span>
+        </span>
+      </label>
+      <div class="actions">
+        <button type="button" id="ex-file" class="btn small primary">JSON 파일 저장</button>
+      </div>
+      <p id="ex-msg" class="msg" role="status" aria-live="polite"></p>
+    </section>
+    <section class="pop-sec ex-data">
+      <h2>레이아웃 불러오기</h2>
+      <p class="hint">공유받은 레이아웃 파일에서 개체를 선택하여 현재 자료에 적용합니다.</p>
+      <div class="actions">
+        <button type="button" id="im-pick" class="btn small">파일 선택</button>
+        <input id="in-layout" type="file" accept=".json,application/json" hidden>
+      </div>
+      <div id="im-box" hidden>
+        <p id="im-file" class="sub"></p>
+        <ul id="im-list" class="ex-list"></ul>
+        <label class="check im-ai" id="im-ai-row" hidden>
+          <input id="im-ai" type="checkbox" checked>
+          <span>분석 파트너 설정 적용 <small id="im-ai-desc"></small></span>
+        </label>
+        <div class="actions">
+          <button type="button" id="im-add" class="btn small primary">선택 개체 추가</button>
+          <button type="button" id="im-replace" class="btn small">현재 레이아웃 교체</button>
+        </div>
+      </div>
+      <p id="im-msg" class="msg" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <!-- 연결 버튼을 누르면 열리는 창 -->
+  <div id="pop" class="pop" role="dialog" aria-label="자료 연결 및 요약" hidden>
+    <section class="pop-sec">
+      <div class="pop-head">
+        <h2>현재 자료</h2>
+        <button type="button" id="pop-close" class="icon-btn" aria-label="닫기">×</button>
+      </div>
+      <div id="pop-summary"></div>
+      <div class="actions">
+        <button type="button" id="btn-preview" class="btn small">원자료 보기</button>
+        <button type="button" id="btn-refetch" class="btn small">다시 조회</button>
+        <button type="button" id="btn-reset" class="btn small">레이아웃 초기화</button>
+        <button type="button" id="btn-disconnect" class="btn small danger">연결 해제</button>
+      </div>
+    </section>
+    <section class="pop-sec">
+      <h2>새 자료 연결</h2>
+      <div id="pop-slot"></div>
+    </section>
+  </div>
+
+  <main>
+    <!-- 첫 화면: 자료 연결 -->
+    <section id="view-connect" class="connect-card" aria-labelledby="conn-title">
+      <div id="connect-form-view">
+        <h2 id="conn-title">자료 연결</h2>
+        <p class="lead" id="conn-lead">자료를 제공하는 서버의 도메인(또는 Apps Script 웹 앱 주소)과 인증코드를 입력하십시오.</p>
+        <div id="conn-slot">
+          <div id="conn-form" class="conn-form">
+            <label class="field conn-net">
+              <span>도메인 또는 웹 앱 주소</span>
+              <input id="in-domain" type="text" inputmode="url" spellcheck="false" autocomplete="off" placeholder="예: data.school.kr 또는 https://script.google.com/macros/s/…/exec">
+            </label>
+            <label class="field conn-net">
+              <span>인증코드</span>
+              <input id="in-code" type="password" spellcheck="false" autocomplete="off" placeholder="서버에서 발급받은 인증코드">
+            </label>
+            <label class="check conn-net">
+              <input id="chk-save-domain" type="checkbox">
+              <span>이 기기에 주소 저장 <small>(인증코드는 저장하지 않습니다)</small></span>
+            </label>
+            <p class="hint conn-net">요청 주소: <code id="req-preview">GET https://(도메인)/api/v1/data</code></p>
+            <button type="button" id="btn-fetch" class="btn primary block">조회</button>
+            <p id="msg" class="msg" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 보드 -->
+    <section id="view-board" class="board-view" hidden aria-labelledby="board-title">
+      <div class="board-head">
+        <div class="bt-row"><h2 id="board-title"></h2><button type="button" id="btn-board-title" class="fx-btn" aria-label="보드 제목 수정" title="보드 제목 수정"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3"/><path d="M13.5 7.5l3 3"/></svg></button><button type="button" id="btn-board-info" class="fx-btn" aria-label="자료 정보" title="자료 정보" aria-expanded="false" aria-controls="board-sub"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg></button></div>
+        <div id="board-sub" class="sub" hidden><span id="board-sub-text"></span></div>
+      </div>
+      <div id="board" class="board"></div>
+      <button type="button" id="btn-ai" class="add-fab second ai-fab" hidden aria-label="분석 파트너 열기·닫기" title="분석 파트너"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5 10l4.6-1.9z"/><path d="M18.5 15.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/></svg></button>
+      <div class="add-fabs" role="group" aria-label="추가">
+        <button type="button" id="fab-add-group" class="add-fab second" aria-label="그룹 만들기" title="그룹 만들기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5A2 2 0 0 1 5 5.5h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg><span>그룹</span></button>
+        <button type="button" id="fab-add-item" class="add-fab" aria-label="개체 추가" title="개체 추가"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>개체</span></button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>두루보드는 받은 자료를 이 브라우저 화면에 표시하는 데에만 사용하며, 자료와 인증코드를 저장하지 않습니다. 분석 파트너를 사용하는 경우에만 교사가 정한 범위의 자료를 선택한 AI 공급자에게 전송합니다.</p>
+  </footer>
+
+  <!-- 그래프 만들기 -->
+  <dialog id="dlg-chart" class="dialog builder">
+    <div class="dialog-body">
+      <div class="builder-head">
+        <div class="bh-title">
+          <h3 id="dlg-chart-title" title="제목 수정">개체 (1)</h3>
+          <input id="cf-title" class="title-edit" type="text" autocomplete="off" maxlength="100" aria-label="제목" hidden>
+          <button type="button" id="btn-title-edit" class="fx-btn" aria-label="제목 수정" title="제목 수정"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3"/><path d="M13.5 7.5l3 3"/></svg></button>
+        </div>
+        <span id="kind-name" class="kind-name" hidden>그래프·표 추가</span>
+        <button type="button" id="btn-help" class="guide-btn"><svg class="q-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.7 9.4a2.4 2.4 0 0 1 4.6.8c0 1.6-2.3 2.1-2.3 3.5"/><circle class="q-dot" cx="12" cy="17" r="1"/></svg><span>사용 안내</span></button>
+      </div>
+      <div class="builder-grid">
+        <nav id="step-nav" class="step-nav" aria-label="설정 단계"></nav>
+        <div class="builder-controls" id="builder-controls">
+          <div class="step" id="step-type" data-name="유형">
+            <div class="step-head">
+              <p class="step-q"><b>1</b> 유형</p>
+              <button type="button" class="help-btn" data-help="type" aria-expanded="false" aria-label="유형 안내"><svg class="q-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.7 9.4a2.4 2.4 0 0 1 4.6.8c0 1.6-2.3 2.1-2.3 3.5"/><circle class="q-dot" cx="12" cy="17" r="1"/></svg></button>
+            </div>
+            <p class="help-text" id="help-type" hidden>그래프의 형태를 고릅니다. 세로 막대는 항목이 적을 때, 가로 막대는 항목이 많거나 이름이 길 때, 꺾은선은 순서가 있는 항목(1단원→6단원)의 흐름을 볼 때 적합합니다. 히스토그램은 값이 어느 구간에 몰려 있는지, 표는 값을 그대로, 명단은 해당 항목을 목록으로 보여 줍니다.</p>
+            <div id="cf-type" class="chips type-chips"></div>
+            <div id="cf-stype" class="st-cards" hidden></div>
+          </div>
+
+          <div class="step" id="step-item" data-name="X축">
+            <div class="step-head">
+              <p class="step-q"><b>2</b> <span class="ax-t" id="t-item">X축</span> <small class="ax-role">항목</small></p>
+              <button type="button" class="help-btn" data-help="item" aria-expanded="false" aria-label="항목 축 안내"><svg class="q-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.7 9.4a2.4 2.4 0 0 1 4.6.8c0 1.6-2.3 2.1-2.3 3.5"/><circle class="q-dot" cx="12" cy="17" r="1"/></svg></button>
+            </div>
+            <p class="help-text" id="help-item" hidden>막대 하나가 무엇인지 고릅니다. 카드 아래의 회색 글자는 실제로 막대에 붙을 이름입니다. ‘학번별’은 학생마다, ‘반별’은 같은 반 학생을 묶어 반마다, ‘단원별’은 아래에서 고른 단원(예: 1단원~6단원)마다 막대 하나를 표시합니다. 축 이름은 그래프에 표시되는 이름이며, 비워 두면 자동으로 정해집니다.</p>
+            <div class="field">
+              <div class="field-head"><span class="field-label">항목 기준</span></div>
+              <div id="cf-item" class="ib-cards" role="group" aria-label="항목 기준"></div>
+              <p id="item-hint" class="by-hint"></p>
+            </div>
+            <div id="slot-xcols"></div>
+            <div class="field">
+              <div class="field-head"><span class="field-label">축 이름</span></div>
+              <input id="cf-iname" type="text" autocomplete="off" maxlength="40" aria-label="항목 축 이름">
+            </div>
+            <div class="opt-row" id="opt-sort">
+              <span class="opt-label">항목 순서</span>
+              <div id="cf-sort" class="chips small-chips"></div>
+            </div>
+          </div>
+
+          <div class="step" id="step-value" data-name="Y축">
+            <div class="step-head">
+              <p class="step-q"><b>3</b> <span class="ax-t" id="t-value">Y축</span> <small class="ax-role">값</small></p>
+              <button type="button" class="help-btn" data-help="value" aria-expanded="false" aria-label="값 축 안내"><svg class="q-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.7 9.4a2.4 2.4 0 0 1 4.6.8c0 1.6-2.3 2.1-2.3 3.5"/><circle class="q-dot" cx="12" cy="17" r="1"/></svg></button>
+            </div>
+            <p class="help-text" id="help-value" hidden>그래프에서는 막대 높이로, 통계에서는 숫자 하나로 나타낼 값을 정합니다. 학번처럼 행을 X축에 놓았다면 여기서 계산에 쓸 열(예: 1단원~6단원)을 고르고, 열을 X축에 놓았다면 계산 방식만 고르면 됩니다(예: 입력률). ‘입력 칸 수’는 값이 들어 있는 칸, ‘미입력 칸 수’는 빈칸의 수이며, 0과 거짓도 입력된 값으로 봅니다.</p>
+            <div id="slot-cols"></div>
+            <div id="slot-method"></div>
+            <div id="stat-opt" class="field" hidden></div>
+            <div class="field">
+              <div class="field-head"><span class="field-label" id="vname-label">축 이름</span></div>
+              <input id="cf-vname" type="text" autocomplete="off" maxlength="40" aria-label="값 축 이름">
+            </div>
+          </div>
+
+          <div class="step" id="step-cols" data-name="열 선택">
+            <div class="step-head">
+              <p class="step-q"><b id="n-cols" class="n-col">1</b> 열 선택</p>
+              <button type="button" class="help-btn" data-help="cols" aria-expanded="false" aria-label="열 선택 안내"><svg class="q-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.7 9.4a2.4 2.4 0 0 1 4.6.8c0 1.6-2.3 2.1-2.3 3.5"/><circle class="q-dot" cx="12" cy="17" r="1"/></svg></button>
+            </div>
+            <p class="help-text" id="help-cols" hidden>계산에 사용할 열을 고릅니다. 예: 1단원~6단원. ‘전체 선택’은 학번·이름 같은 식별 열을 제외하고 선택합니다. 열을 길게 누르거나 마우스 오른쪽 단추를 누르면 자료형(수치·문자 등)을 변경할 수 있습니다.</p>
+            <div class="field" id="step-usecols">
+              <div class="field-head">
+                <span class="field-label" id="usecols-label"><i class="lg col"></i>사용할 열</span>
+                <span class="mini-actions"><button type="button" id="cf-all" class="link">전체 선택</button><button type="button" id="cf-none" class="link">선택 해제</button></span>
+              </div>
+              <div id="cf-cols" class="chips"></div>
+            </div>
+          </div>
+
+          <div class="step" id="step-what" data-name="계산">
+            <div class="step-head">
+              <p class="step-q"><b id="n-what" class="n-out">2</b> 계산</p>
+              <button type="button" class="help-btn" data-help="what" aria-expanded="false" aria-label="계산 안내"><svg class="q-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.7 9.4a2.4 2.4 0 0 1 4.6.8c0 1.6-2.3 2.1-2.3 3.5"/><circle class="q-dot" cx="12" cy="17" r="1"/></svg></button>
+            </div>
+            <p class="help-text" id="help-what" hidden>먼저 계산 방향을 고릅니다. ‘열마다’는 열(세로줄)마다 값 하나(예: 단원별 완료율), ‘행마다’는 행(가로줄)마다 값 하나(예: 학생별 진도율), ‘전체 하나로’는 선택한 모든 칸을 값 하나(예: 전체 진도율)로 계산합니다. 다음으로 계산 방식을 고릅니다. ‘입력 칸 수’는 값이 들어 있는 칸, ‘미입력 칸 수’는 빈칸의 수이며, 0과 거짓도 입력된 값으로 봅니다. 산출 범위로 상위·하위 일부나 기준값 이상·이하만 산출할 수 있습니다.</p>
+            <div class="field" id="dir-field" hidden>
+              <div class="field-head"><span class="field-label">계산 방향</span></div>
+              <div id="cf-dir" class="dir-cards" role="group" aria-label="계산 방향"></div>
+              <div id="row-by" class="row-by" hidden></div>
+            </div>
+            <div class="field calc-m">
+              <div class="field-head"><span class="field-label">계산 방식</span></div>
+              <div id="cf-method" class="chips" role="group" aria-label="계산 방식"></div>
+              <p id="method-note" class="pr-note" hidden></p>
+              <p id="method-ex" class="method-ex"></p>
+            </div>
+            <div id="cf-presets" hidden></div>
+            <div class="field" id="range-sec">
+              <div class="field-head"><span class="field-label">산출 범위</span><span class="field-hint">상위·하위 일부만 산출</span></div>
+              <div id="cf-range" class="chips" role="group" aria-label="산출 범위">
+                <button type="button" class="chip" data-id="all">전체</button>
+                <button type="button" class="chip" data-id="top">상위</button>
+                <button type="button" class="chip" data-id="bottom">하위</button>
+                <button type="button" class="chip" data-id="le" title="기준값 이하">≤</button>
+                <button type="button" class="chip" data-id="ge" title="기준값 이상">≥</button>
+              </div>
+              <div id="range-opt" class="range-opt" hidden>
+                <input id="cf-range-n" type="text" inputmode="decimal" aria-label="범위 값">
+                <span id="range-suffix" class="range-suffix"></span>
+                <div id="range-unit" class="seg-mini" role="group" aria-label="단위"><button type="button" data-u="pct">%</button><button type="button" data-u="cnt">개</button></div>
+              </div>
+              <p id="range-desc" class="field-hint"></p>
+            </div>
+          </div>
+
+          <div class="step" id="step-filter" data-name="조건">
+            <div class="step-head">
+              <p class="step-q"><b id="n-filter" class="n-out">3</b> 조건</p>
+              <button type="button" class="help-btn" data-help="filter" aria-expanded="false" aria-label="조건 안내"><svg class="q-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.7 9.4a2.4 2.4 0 0 1 4.6.8c0 1.6-2.3 2.1-2.3 3.5"/><circle class="q-dot" cx="12" cy="17" r="1"/></svg></button>
+            </div>
+            <p class="help-text" id="help-filter" hidden>조건에 맞는 행만 골라 계산합니다. [조건 추가]를 누르고 기준 열을 고른 뒤, 문자 열은 값을 체크하고(예: 반 2-1), 숫자 열은 범위를 지정합니다(예: 정답률 0 ~ 70). 한 열에서 여러 값을 고르면 그중 하나라도 해당하는 행, 조건이 여러 개이면 모두 만족하는 행을 씁니다. 산출 범위로 계산 결과의 상위·하위 일부만 남길 수도 있습니다.</p>
+            <div class="field">
+              <div class="field-head"><span class="field-label">행 조건</span><span class="field-hint">조건에 맞는 행만 계산</span></div>
+              <div id="cf-filter" class="filter"></div>
+              <p id="cf-filter-sum" class="fsum"></p>
+            </div>
+            <div id="slot-range"></div>
+          </div>
+
+          <div class="step" id="step-style" data-name="서식">
+            <div class="step-head">
+              <p class="step-q"><b>5</b> 서식</p>
+            </div>
+            <div class="opt-row" id="opt-align">
+              <span class="opt-label">값 정렬</span>
+              <div id="cf-align" class="chips small-chips" role="group" aria-label="값 정렬"><button type="button" class="chip" data-id="left">왼쪽</button><button type="button" class="chip" data-id="center">가운데</button><button type="button" class="chip" data-id="right">오른쪽</button></div>
+            </div>
+            <div class="opt-row" id="opt-hl">
+              <span class="opt-label">강조</span>
+              <div id="cf-hl" class="chips small-chips" role="group" aria-label="강조"><button type="button" class="chip" data-id="none">없음</button><button type="button" class="chip" data-id="min">최저값</button><button type="button" class="chip" data-id="max">최고값</button></div>
+            </div>
+            <div class="opt-row" id="opt-width">
+              <span class="opt-label">카드 너비</span>
+              <div id="cf-width" class="chips small-chips"></div>
+            </div>
+            <div class="opt-row" id="opt-color">
+              <span class="opt-label">색상</span>
+              <div class="clr-rows">
+                <div class="clr-line"><span class="clr-name">기본 색</span><div id="cf-color-base" class="clr-pick" role="radiogroup" aria-label="기본 색"></div></div>
+                <div class="clr-line" id="cf-color-point-line"><span class="clr-name">강조 색</span><div id="cf-color-point" class="clr-pick" role="radiogroup" aria-label="강조 색"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="vis-scrim" class="vis-scrim" hidden></div>
+        <div id="builder-visual" class="builder-visual" data-pane="preview" data-collapsed="false">
+          <div class="vis-tabs">
+            <span class="vis-title">세부 설정</span>
+            <span id="vis-sum" class="vis-sum"></span>
+            <button type="button" id="vt-toggle" class="vis-toggle" aria-expanded="true" aria-label="세부 설정 접기">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </button>
+          </div>
+          <div class="pane-cap">
+            <span class="pane-name">미리보기</span>
+            <span id="pane-desc" class="pane-desc"></span>
+          </div>
+          <div class="vis-cols-wrap">
+            <span class="vis-cols-label">열 선택</span>
+            <div id="vis-cols" class="vis-cols" role="group" aria-label="열 선택"></div>
+          </div>
+          <div id="vp-schema" class="vis-pane">
+            <p class="vis-label">자료 표</p>
+            <ul class="legend">
+              <li><i class="lg col"></i>선택한 열</li>
+              <li id="lg-lab-item"><i class="lg lab"></i>기준 열</li>
+              <li><i class="lg out"></i>집계 결과</li>
+            </ul>
+            <div class="schema-wrap"><div id="schema" class="schema"></div></div>
+            <div id="schema-note" class="note info"><svg class="n-ico n-info" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle class="n-dot" cx="12" cy="7.8" r="1"/></svg><svg class="n-ico n-warn" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 4.2 2.9 17.5A2 2 0 0 0 4.6 20.5h14.8a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4.5"/><circle class="n-dot" cx="12" cy="17" r="1"/></svg><p id="schema-text" class="schema-text"></p></div>
+            <div id="schema-foot" class="tgl-foot"><button type="button" id="btn-table" class="tbl-switch" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13"/><path d="M14 5l3 3-3 3"/><path d="M20 16H7"/><path d="M10 13l-3 3 3 3"/></svg><span id="btn-table-text">표로 전환</span></button></div>
+          </div>
+          <div id="vp-preview" class="vis-pane">
+            <div class="pv-head">
+              <p class="vis-label">결과</p>
+              <div class="kind-seg" role="radiogroup" aria-label="개체 종류">
+                <button type="button" id="kd-chart" role="radio" aria-checked="true">그래프·표</button>
+                <button type="button" id="kd-stat" role="radio" aria-checked="false">통계</button>
+              </div>
+            </div>
+            <div id="pv-box" class="pv-box"></div>
+          </div>
+        </div>
+      </div>
+
+      <p id="cf-error" class="msg error" role="alert"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cf-cancel" class="btn">취소</button>
+        <button type="button" id="cf-ok" class="btn primary">추가</button>
+      </div>
+    </div>
+      <div id="col-pop" class="col-pop" role="dialog" aria-label="열 자료형 설정" hidden>
+      <div class="cp-head">
+        <strong id="cp-name"></strong>
+        <button type="button" id="cp-close" class="icon-btn" aria-label="닫기">×</button>
+      </div>
+      <p class="cp-label">자료형</p>
+      <div id="cp-types" class="cp-types" role="radiogroup" aria-label="자료형"></div>
+      <label class="cp-switch">
+        <span class="cp-switch-text"><span>식별 열</span><small id="cp-id-auto"></small></span>
+        <input id="cp-id" type="checkbox" role="switch">
+        <i aria-hidden="true"></i>
+      </label>
+      <button type="button" id="cp-reset" class="link cp-reset">자동 판정으로 되돌리기</button>
+    </div>
+  </dialog>
+
+  <!-- 원자료 보기 -->
+  <dialog id="dlg-preview" class="dialog wide">
+    <div class="dialog-body">
+      <h3>원자료 보기</h3>
+      <p id="pv-sub" class="hint"></p>
+      <div class="table-wrap"><table id="pv-table" class="table"></table></div>
+      <div class="dialog-actions">
+        <button type="button" id="pv-close" class="btn">닫기</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 사용 안내 -->
+  <dialog id="dlg-help" class="dialog help-dlg" aria-labelledby="help-title">
+    <div class="dialog-body">
+      <h3 id="help-title">개체 추가 사용 안내</h3>
+      <ol class="guide">
+        <li><strong>열 선택</strong><span>계산에 사용할 열을 고릅니다. 예: 1단원~6단원</span></li>
+        <li><strong>계산</strong><span>계산 방향(열마다·행마다·전체 하나로)과 방식(평균·합계·최댓값·최솟값·입력 칸 수·입력률·미입력 칸 수)을 고릅니다. 예: 학생별 진도율 = 행마다 · 입력률</span>
+          <span class="guide-ex">‘학번별 입력률(%)’ → 학생마다 막대 하나, 입력된 단원의 비율(진도율)</span>
+          <span class="guide-ex">‘열별 입력 칸 수’ → 단원마다 막대 하나, 입력한 학생 수</span></li>
+        <li><strong>조건</strong><span>열별로 조건을 걸어 계산할 행을 고릅니다. 문자 열은 값 체크, 숫자 열은 범위 지정. 예: 반 2-1, 정답률 0 ~ 60.</span></li>
+        <li><strong>표시</strong><span>막대·꺾은선·히스토그램·표·명단 중에서 고르고, 최저값·최고값을 강조할 수 있습니다. 명단은 행마다 계산에서 해당 행을 목록으로 보여 줍니다.</span></li>
+        
+      </ol>
+      <div class="guide-box">
+        <p><strong>표로 전환</strong> 미리보기 오른쪽 아래의 [표로 전환]을 누르면 그 자리에 자료 표가 표시되며, 선택한 열과 계산 결과가 색으로 구분됩니다. [미리보기로 전환]을 누르면 돌아갑니다.</p>
+        <p><strong>용어</strong> 입력 칸: 값이 들어 있는 칸 · 미입력 칸: 빈칸 · 행: 가로줄(보통 학생 한 명) · 열: 세로줄(단원, 과제 등)</p>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="help-close" class="btn primary">확인</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 조회 결과 요약 -->
+  <dialog id="dlg-summary" class="dialog summary-dlg" aria-labelledby="sum-dlg-title">
+    <div class="dialog-body">
+      <p class="eyebrow" id="sum-dlg-title">자료를 불러왔습니다</p>
+      <div id="intro-summary"></div>
+      <div class="dialog-actions">
+        <button type="button" id="btn-summary-ok" class="btn primary">확인</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 개체 종류 선택 -->
+  <dialog id="dlg-kind" class="dialog kind-dlg" aria-labelledby="kind-dlg-title">
+    <div class="dialog-body">
+      <h3 id="kind-dlg-title" tabindex="-1" autofocus>개체 추가</h3>
+      <div class="kind-cards kc-gap">
+        <button type="button" id="kc-chart" class="kind-card">
+          <svg class="kc-art" viewBox="0 0 120 64" aria-hidden="true"><path class="kc-axis" d="M8 56h104"/><rect x="16" y="30" width="14" height="26" rx="2"/><rect x="38" y="14" width="14" height="42" rx="2"/><rect x="60" y="24" width="14" height="32" rx="2"/><rect x="82" y="8" width="14" height="48" rx="2"/></svg>
+          <b>그래프·표</b>
+          <span>항목별 값을 막대, 꺾은선, 표, 명단 등으로 비교합니다.</span>
+        </button>
+        <button type="button" id="kc-stat" class="kind-card">
+          <svg class="kc-art" viewBox="0 0 120 64" aria-hidden="true"><rect class="kc-box" x="14" y="6" width="92" height="52" rx="8"/><rect class="kc-line" x="26" y="16" width="34" height="5" rx="2.5"/><text x="26" y="44" class="kc-num">84.7%</text></svg>
+          <b>통계</b>
+          <span>비율·개수·평균처럼 숫자 하나로 요약합니다. 예: 전체 진도율 84.7%</span>
+        </button>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="kc-cancel" class="btn">취소</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 대상 행: 열별 조건 선택 창 -->
+  <dialog id="dlg-ff" class="dialog sheet-dlg" aria-labelledby="ff-title">
+    <div class="dialog-body">
+      <div class="sheet-grab" aria-hidden="true"></div>
+      <h3 id="ff-title">조건</h3>
+      <div id="ff-body" class="ff-body"></div>
+      <div class="dialog-actions">
+        <button type="button" id="ff-cancel" class="btn">취소</button>
+        <button type="button" id="ff-ok" class="btn primary">적용</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 자료 규격 오류 -->
+  <dialog id="dlg-spec" class="dialog spec-dlg" aria-labelledby="se-title">
+    <div class="dialog-body">
+      <div class="spec-head">
+        <svg class="spec-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 4.2 2.9 17.5A2 2 0 0 0 4.6 20.5h14.8a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4.5"/><circle cx="12" cy="17" r="1"/></svg>
+        <h3 id="se-title">자료 규격 오류</h3>
+      </div>
+      <p class="spec-lead">서버에 연결되었으나, 받은 응답이 두루보드 자료 규격에 맞지 않아 표시할 수 없습니다.</p>
+      <dl class="spec-list">
+        <dt>오류 내용</dt><dd id="se-reason"></dd>
+        <dt>받은 응답</dt><dd id="se-got"></dd>
+        <dt>요청 주소</dt><dd><code id="se-src"></code></dd>
+        <dt>올바른 형식</dt><dd><code>{ "rows": [ { "학번": "30101", "1단원": "완료" }, … ] }</code></dd>
+      </dl>
+      <p class="spec-foot">서버 담당자에게 위 내용을 전달하십시오. 자세한 규격은 <a href="https://duruboard.github.io/API_SPEC.md" target="_blank" rel="noopener noreferrer">두루보드 자료 제공 규격</a>에 있습니다.</p>
+      <div class="dialog-actions">
+        <button type="button" id="se-ok" class="btn primary">확인</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 확인 -->
+  <dialog id="dlg-name" class="dialog name-dlg" aria-labelledby="nm-title">
+    <div id="nm-form" class="dialog-body">
+      <h3 id="nm-title">그룹 만들기</h3>
+      <input id="nm-input" type="text" maxlength="30" autocomplete="off" aria-label="그룹 이름" placeholder="예: 정보과학">
+      <p id="nm-msg" class="msg"></p>
+      <div class="dialog-actions">
+        <button type="button" id="nm-cancel" class="btn">취소</button>
+        <button type="button" id="nm-ok" class="btn primary">확인</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-groups" class="dialog groups-dlg" aria-labelledby="gm-title">
+    <div class="dialog-body">
+      <div class="pop-head">
+        <h3 id="gm-title">그룹 관리</h3>
+        <button type="button" id="gm-close" class="icon-btn" aria-label="닫기">×</button>
+      </div>
+      <p class="mv-sub">그룹은 최대 2단계까지 만들 수 있습니다. 예: 정보과학 › A반</p>
+      <div id="gm-list" class="gm-list"></div>
+      <div class="dialog-actions">
+        <button type="button" id="gm-new" class="btn primary">＋ 그룹 만들기</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-move" class="dialog sheet-dlg move-dlg" aria-labelledby="mv-title">
+    <div class="dialog-body">
+      <h3 id="mv-title">이동할 위치</h3>
+      <p id="mv-sub" class="mv-sub"></p>
+      <div id="mv-list" class="mv-list" role="listbox" aria-labelledby="mv-title"></div>
+      <div class="dialog-actions">
+        <button type="button" id="mv-new" class="btn">＋ 새 그룹</button>
+        <button type="button" id="mv-cancel" class="btn">닫기</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 분석 파트너: 대화 -->
+  <dialog id="dlg-ai" class="dialog ai-dlg" aria-labelledby="ai-title">
+    <div class="ai-wrap">
+      <div id="ai-resize" class="ai-resize" role="separator" aria-orientation="vertical" aria-label="분석 파트너 창 너비 조절 (좌우 화살표)" tabindex="0" title="끌어서 너비 조절 · 두 번 눌러 기본 너비"></div>
+      <div class="ai-head">
+        <div class="ai-head-t">
+          <h3 id="ai-title">분석 파트너</h3>
+          <span id="ai-who" class="ai-who"></span>
+        </div>
+        <button type="button" id="ai-clear" class="btn small">새 대화</button>
+        <button type="button" id="ai-close" class="icon-btn" aria-label="닫기">×</button>
+      </div>
+      <div id="ai-log" class="ai-log" aria-live="polite"></div>
+      <div class="ai-foot">
+        <div id="ai-starters" class="ai-starters"></div>
+        <div class="ai-input">
+          <textarea id="ai-in" rows="1" maxlength="2000" placeholder="자료에 대해 질문하십시오" aria-label="질문 입력"></textarea>
+          <button type="button" id="ai-send" class="ai-send-btn" aria-label="전송">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg>
+          </button>
+        </div>
+        <p class="ai-note">AI의 답변은 부정확할 수 있으므로 원자료로 확인하십시오.</p>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 분석 파트너: 열별 전송 설정 -->
+  <dialog id="dlg-aicols" class="dialog aicols-dlg" aria-labelledby="ac-title">
+    <div class="dialog-body">
+      <div class="pop-head">
+        <h3 id="ac-title">열별 전송 설정</h3>
+        <button type="button" id="ac-close" class="icon-btn" aria-label="닫기">×</button>
+      </div>
+      <dl class="ac-legend">
+        <div><dt>전송</dt><dd>값을 그대로 보냅니다.</dd></div>
+        <div><dt>가명</dt><dd>값마다 고유 번호(예: ID-07)로 바꾸어 보냅니다. 답변에 나온 번호는 이 화면에서만 원래 값으로 복원합니다.</dd></div>
+        <div><dt>제외</dt><dd>열 이름과 값을 모두 보내지 않습니다.</dd></div>
+      </dl>
+      <div class="mini-actions"><button type="button" id="ac-default" class="link">기본값으로</button><button type="button" id="ac-all" class="link">모두 전송</button><button type="button" id="ac-alias" class="link">모두 가명</button><button type="button" id="ac-drop" class="link">모두 제외</button></div>
+      <div id="ac-list" class="ac-list"></div>
+      <div class="dialog-actions">
+        <button type="button" id="ac-ok" class="btn primary">확인</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-confirm" class="dialog">
+    <div class="dialog-body">
+      <p id="cm-text"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cm-cancel" class="btn">취소</button>
+        <button type="button" id="cm-ok" class="btn primary">확인</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="vendor/chart.umd.js"></script>
+  <script src="app.js?v=20261102c"></script>
+</body>
+</html>
