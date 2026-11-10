@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>두루보드</title>
+<meta name="description" content="받은 자료를 그래프와 통계로 정리하는 교실용 현황판">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap">
+<style>
+/* 레이아웃: 휴대전화 폭 한 줄 흐름, 둥근 카드와 막대 캐릭터 */
+:root {
+  --bg: #f7f5ff;
+  --surface: #ffffff;
+  --text: #2a2d46;
+  --text-2: #6b6f8c;
+  --line: #e6e3f6;
+  --accent: #5b63d6;
+  --accent-2: #8a91ee;
+  --accent-3: #c3c7f8;
+  --accent-soft: #eceefe;
+  --pink: #ffb8c9;
+  --yellow: #ffd66b;
+  --shadow: 0 8px 24px rgba(91, 99, 214, .12);
+  --on-accent: #ffffff;
+  --m1a: #d3d8ff; --m1b: #c0c8ff;
+  --m2a: #aab2ff; --m2b: #949df8;
+  --m3a: #d0c4ff; --m3b: #bba9fb;
+  --m-face: #3d2280; --m-shine: rgba(255, 255, 255, .55);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15172a; --surface: #1e2138; --text: #eceefe; --text-2: #a5a9c9;
+    --line: #2f3352; --accent: #959cf3; --accent-2: #7a82e8; --accent-3: #4a51a8;
+    --accent-soft: #262a4a; --pink: #e58aa1; --yellow: #e9bf52;
+    --shadow: 0 8px 24px rgba(0, 0, 0, .3); --on-accent: #15172a; color-scheme: dark; --m1a: #c4cbff; --m1b: #b0b9fb; --m2a: #a3abff; --m2b: #8f98f7; --m3a: #c8bbff; --m3b: #b3a2f8; --m-face: #3d2280; --m-shine: rgba(255, 255, 255, .35);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15172a; --surface: #1e2138; --text: #eceefe; --text-2: #a5a9c9;
+  --line: #2f3352; --accent: #959cf3; --accent-2: #7a82e8; --accent-3: #4a51a8;
+  --accent-soft: #262a4a; --pink: #e58aa1; --yellow: #e9bf52;
+  --shadow: 0 8px 24px rgba(0, 0, 0, .3); --on-accent: #15172a; color-scheme: dark; --m1a: #c4cbff; --m1b: #b0b9fb; --m2a: #a3abff; --m2b: #8f98f7; --m3a: #c8bbff; --m3b: #b3a2f8; --m-face: #3d2280; --m-shine: rgba(255, 255, 255, .35);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Gowun Dodum", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  word-break: keep-all;
+  overflow-x: clip;
+  position: relative;
+  min-height: 100vh;
+}
+
+/* 배경 장식 */
+.deco { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.blob { position: absolute; border-radius: 50%; filter: blur(2px); z-index: 0; pointer-events: none; }
+.b1 { width: 260px; height: 260px; background: var(--accent-soft); top: -80px; right: -90px; }
+.b2 { width: 180px; height: 180px; background: var(--accent-soft); top: 360px; left: -100px; opacity: .8; }
+
+.wrap { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding-block: 0 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* 첫 화면 */
+.hero { text-align: center; padding: 48px 0 24px; }
+.mascot { width: 168px; height: auto; display: block; margin: 0 auto 8px; overflow: visible; }
+.m-shadow { fill: var(--m2b); opacity: .12; animation: shadow 2.6s ease-in-out infinite; transform-origin: 80px 128px; }
+.m-body { animation: bob 2.6s ease-in-out infinite; }
+.m-bar1 { fill: url(#g1); }
+.m-bar2 { fill: url(#g2); }
+.m-bar3 { fill: url(#g3); }
+.g1a { stop-color: var(--m1a); } .g1b { stop-color: var(--m1b); }
+.g2a { stop-color: var(--m2a); } .g2b { stop-color: var(--m2b); }
+.g3a { stop-color: var(--m3a); } .g3b { stop-color: var(--m3b); }
+.m-shine { fill: var(--m-shine); }
+.m-eye { fill: var(--m-face); }
+.m-cheek { fill: #ff9fb7; opacity: .85; }
+.m-mouth { fill: none; stroke: var(--m-face); stroke-width: 2.4; stroke-linecap: round; }
+.m-spark { fill: var(--yellow); animation: twinkle 1.8s ease-in-out infinite; }
+.m-spark.s2 { animation-delay: .9s; }
+.m-eye { animation: blink 4.5s infinite; transform-box: fill-box; transform-origin: center; }
+
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+@keyframes shadow { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(.86); } }
+@keyframes twinkle { 0%, 100% { opacity: .2; transform: scale(.7); } 50% { opacity: 1; transform: scale(1); } }
+@keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+
+.title { font-family: "Jua", "Gowun Dodum", sans-serif; font-size: 40px; font-weight: 400; letter-spacing: -.02em; margin: 4px 0 6px; }
+.lead { color: var(--text-2); font-size: 16px; margin: 0 0 24px; }
+.lead b { color: var(--accent); font-weight: 700; }
+
+.cta { display: flex; flex-direction: column; gap: 10px; }
+.btn {
+  display: block; text-align: center; text-decoration: none;
+  font-weight: 700; font-size: 16px; padding: 14px 18px; border-radius: 999px;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.btn:active { transform: scale(.97); }
+.btn:focus-visible { outline: 3px solid var(--accent-3); outline-offset: 2px; }
+.btn.primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow); }
+.btn.ghost { background: var(--surface); color: var(--accent); border: 1.5px solid var(--line); }
+@media (hover: hover) { .btn:hover { transform: translateY(-2px); } }
+
+/* 구획 */
+.block { padding: 20px 0; }
+.h2 { margin: 0 0 14px; font-size: 16px; }
+.tag {
+  font-family: "Jua", "Gowun Dodum", sans-serif; letter-spacing: .02em;
+  display: inline-block; background: var(--accent-soft); color: var(--accent);
+  padding: 4px 14px; border-radius: 999px; font-weight: 800; font-size: 14px;
+}
+
+/* 이용 순서 */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.step {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: var(--surface); border-radius: 20px; padding: 16px; box-shadow: var(--shadow);
+}
+.num {
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent); font-weight: 800;
+  display: grid; place-items: center; font-size: 15px;
+}
+.step h3, .card h3 { margin: 0 0 2px; font-size: 17px; font-family: "Jua", "Gowun Dodum", sans-serif; font-weight: 400; }
+.step p, .card p { margin: 0; font-size: 14px; color: var(--text-2); }
+
+/* 활용 예시 */
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.card { background: var(--surface); border-radius: 20px; padding: 14px; box-shadow: var(--shadow); }
+.mini {
+  height: 64px; border-radius: 14px; background: var(--accent-soft);
+  margin-bottom: 10px; padding: 10px 12px; display: flex; align-items: flex-end; gap: 6px;
+}
+.mini.bars i { flex: 1; border-radius: 6px 6px 3px 3px; background: var(--accent-2); }
+.mini.bars i:nth-child(1) { height: 60%; }
+.mini.bars i:nth-child(2) { height: 85%; }
+.mini.bars i:nth-child(3) { height: 45%; }
+.mini.bars i:nth-child(4) { height: 100%; }
+.mini.bars i:nth-child(5) { height: 70%; }
+.mini.bars.low i { background: var(--accent-3); }
+.mini.bars.low i:nth-child(3) { background: var(--pink); }
+.mini.list { flex-direction: column; align-items: stretch; justify-content: center; gap: 6px; }
+.mini.list i { display: block; height: 8px; border-radius: 99px; background: var(--accent-2); }
+.mini.list i:nth-child(2) { width: 75%; }
+.mini.list i:nth-child(3) { width: 50%; }
+.mini.stat { align-items: center; justify-content: center; }
+.mini.stat span { font-size: 26px; font-weight: 800; color: var(--accent); }
+.mini.stat span::after { content: "%"; font-size: 14px; margin-left: 2px; }
+
+/* 안심 사항 */
+.safe {
+  list-style: none; margin: 0; padding: 16px; display: grid; gap: 10px;
+  background: var(--surface); border-radius: 20px; box-shadow: var(--shadow);
+}
+.keep-list { list-style: none; margin: 4px 0 6px; padding: 0; display: grid; gap: 6px; }
+.safe .keep-list li { display: block; font-size: 14px; color: var(--text-2); }
+.keep-list b { color: var(--text); margin-right: 6px; }
+.safe li { display: flex; gap: 10px; font-size: 14px; color: var(--text); }
+.dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-2); margin-top: 7px; }
+.safe li:nth-child(2) .dot { background: var(--pink); }
+.safe li:nth-child(3) .dot { background: var(--yellow); }
+.safe li:nth-child(4) .dot { background: var(--accent-3); }
+
+/* 마무리 */
+.end { text-align: center; padding: 24px 0 8px; }
+.end p { margin: 0 0 12px; color: var(--text-2); font-size: 14px; }
+.foot { position: relative; z-index: 1; text-align: center; font-size: 12px; color: var(--text-2); padding: 16px 16px 32px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .m-body, .m-shadow, .m-spark, .m-eye { animation: none; }
+}
+
+.api p { margin: 0; font-size: 14px; }
+.api .sub { color: var(--text-2); }
+.code { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft); color: var(--accent);
+  font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; overflow-x: auto; white-space: pre; }
+.foot { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.btn, .tag, .num { font-family: "Jua", "Gowun Dodum", sans-serif; font-weight: 400; }
+.btn { font-size: 17px; }
+
+
+/* 화면 밝기: 자동 → 밝게 → 어둡게 */
+.theme-btn {
+  position: fixed; z-index: 5; top: calc(env(safe-area-inset-top, 0px) + 14px); right: max(14px, calc(env(safe-area-inset-right, 0px) + 14px));
+  width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  background: var(--surface); color: var(--accent); border: 1px solid var(--line); box-shadow: var(--shadow);
+}
+.theme-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: none; }
+.theme-btn svg .fill { fill: currentColor; stroke: none; }
+.theme-btn[data-mode="auto"] .t-auto, .theme-btn[data-mode="light"] .t-light, .theme-btn[data-mode="dark"] .t-dark { display: block; }
+.theme-btn:focus-visible { outline: 3px solid var(--accent-3); outline-offset: 2px; }
+
+/* 기존 시스템 연결: 요청문 */
+.att { margin: 2px 0 0; padding-left: 18px; font-size: 13.5px; color: var(--text); display: grid; gap: 2px; }
+.api a { color: var(--accent); font-weight: 700; }
+.att b { color: var(--accent); font-weight: 700; margin-right: 6px; }
+.prompt-box { position: relative; }
+.code.prompt { font-family: "Gowun Dodum", system-ui, sans-serif; font-size: 13.5px; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; max-height: none; overflow-y: auto; padding-top: 44px; color: var(--text); line-height: 1.6; }
+.copy-btn {
+  position: absolute; top: 8px; right: 8px; z-index: 1; border: 0; cursor: pointer;
+  font: 700 13px/1 "Gowun Dodum", sans-serif; padding: 8px 12px; border-radius: 999px;
+  background: var(--accent); color: var(--on-accent);
+}
+.copy-btn.done { background: #2f9e6a; }
+.copy-btn:focus-visible { outline: 3px solid var(--accent-3); outline-offset: 2px; }
+
+/* 마스코트: 흰 얼굴 (가운데 막대를 조금 진하게 하여 대비 확보) */
+:root, :root[data-theme="dark"] { --m2a: #7b82f2; --m2b: #5f66e4; --m-face: #ffffff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --m2a: #7b82f2; --m2b: #5f66e4; --m-face: #ffffff; } }
+
+.api-h { display: block; font-size: 14.5px; color: var(--accent); font-family: "Jua", "Gowun Dodum", sans-serif; font-weight: 400; }
+.api-sep { border: 0; border-top: 1px dashed var(--line); margin: 4px 0; width: 100%; }
+.code.inl, .inl { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; background: var(--accent-soft); color: var(--accent); padding: 1px 6px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<div class="deco" aria-hidden="true"><div class="blob b1"></div><div class="blob b2"></div></div>
+
+  <button type="button" id="theme-btn" class="theme-btn" data-mode="auto" aria-label="화면 밝기: 자동 (누르면 변경)" title="화면 밝기: 자동">
+    <svg class="t-auto" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" class="fill"/></svg>
+    <svg class="t-light" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>
+    <svg class="t-dark" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+  </button>
+  <main class="wrap">
+    <!-- 첫 화면 -->
+    <section class="hero">
+      <svg class="mascot" viewBox="0 0 160 140" aria-hidden="true">
+        <defs>
+          <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop class="g1a" offset="0"></stop><stop class="g1b" offset="1"></stop></linearGradient>
+          <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop class="g2a" offset="0"></stop><stop class="g2b" offset="1"></stop></linearGradient>
+          <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop class="g3a" offset="0"></stop><stop class="g3b" offset="1"></stop></linearGradient>
+        </defs>
+        <ellipse class="m-shadow" cx="80" cy="128" rx="54" ry="7"></ellipse>
+        <g class="m-body">
+          <rect class="m-bar m-bar1" x="28" y="62" width="30" height="60" rx="13"></rect>
+          <rect class="m-bar m-bar2" x="65" y="30" width="30" height="92" rx="13"></rect>
+          <rect class="m-bar m-bar3" x="102" y="48" width="30" height="74" rx="13"></rect>
+          <circle class="m-eye" cx="74" cy="60" r="3.6"></circle>
+          <circle class="m-eye" cx="86" cy="60" r="3.6"></circle>
+          <circle class="m-cheek" cx="68.5" cy="67" r="3.4"></circle>
+          <circle class="m-cheek" cx="91.5" cy="67" r="3.4"></circle>
+          <path class="m-mouth" d="M75 70 q5 5 10 0"></path>
+          <circle class="m-spark" cx="140" cy="28" r="4"></circle>
+          <circle class="m-spark s2" cx="22" cy="44" r="3"></circle>
+        </g>
+      </svg>
+
+      <h1 class="title">두루보드</h1>
+      <p class="lead">받은 자료를 <b>그래프</b>와 <b>통계</b>로<br>손쉽게 정리하는 교실용 현황판입니다.</p>
+
+      <div class="cta">
+        <a class="btn primary" href="index.html">두루보드 시작</a>
+      </div>
+    </section>
+
+    <!-- 이용 순서 -->
+    <section class="block">
+      <h2 class="h2"><span class="tag">이용 순서</span></h2>
+      <ol class="steps">
+        <li class="step">
+          <span class="num">1</span>
+          <div>
+            <h3>자료 연결</h3>
+            <p>도메인과 인증코드를 입력하고 자료를 조회합니다.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="num">2</span>
+          <div>
+            <h3>개체 구성</h3>
+            <p>그래프 또는 통계를 고르고, 위쪽 미리보기를 보며 축과 조건을 설정합니다.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="num">3</span>
+          <div>
+            <h3>현황 확인</h3>
+            <p>보드에 모인 개체로 학급 현황을 한눈에 확인합니다. 구성한 배치는 파일로 공유할 수 있습니다.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- 활용 예시 -->
+    <section class="block">
+      <h2 class="h2"><span class="tag">활용 예시</span></h2>
+      <div class="cards">
+        <article class="card">
+          <div class="mini bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <h3>학생별 진도율</h3>
+          <p>학생마다 입력된 칸의 비율을 막대로 표시합니다.</p>
+        </article>
+        <article class="card">
+          <div class="mini bars low" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <h3>단원별 해결률</h3>
+          <p>해결률이 가장 낮은 단원을 강조해 표시합니다.</p>
+        </article>
+        <article class="card">
+          <div class="mini list" aria-hidden="true"><i></i><i></i><i></i></div>
+          <h3>미해결 학생 명단</h3>
+          <p>특정 단원을 해결하지 않은 학생을 목록으로 추립니다.</p>
+        </article>
+        <article class="card">
+          <div class="mini stat" aria-hidden="true"><span>78.9</span></div>
+          <h3>반별 평균 정답률</h3>
+          <p>조건에 맞는 행만 골라 하나의 수치로 산출합니다.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- 안심 사항 -->
+    <section class="block">
+      <h2 class="h2"><span class="tag">안심 사항</span></h2>
+      <ul class="safe">
+        <li><span class="dot" aria-hidden="true"></span>인증코드는 화면을 닫으면 사라지며, 저장하지 않습니다.</li>
+        <li><span class="dot" aria-hidden="true"></span>받은 자료는 이 기기 화면에만 표시합니다. 분석 파트너(AI)를 사용하는 경우에만, 교사가 정한 범위의 자료를 선택한 AI 공급자에게 전송합니다.</li>
+        <li><span class="dot" aria-hidden="true"></span>분석 파트너로 보내는 자료 중 학번 등은 가명(ID-01 등)으로 바꾸어 보낼 수 있으며, 원래 값은 이 화면에서만 확인합니다.</li>
+        <li><span class="dot" aria-hidden="true"></span>자료에 포함할 정보는 자료 제공자(교사)가 결정합니다.</li>
+      </ul>
+    </section>
+
+    <!-- 분석 파트너 인증 키 -->
+    <section class="block">
+      <h2 class="h2"><span class="tag">AI 인증 키 보관</span></h2>
+      <div class="safe api">
+        <p>분석 파트너에 쓰는 AI 인증 키는 레이아웃 내보내기에 포함되지 않으며, 실행 방식에 따라 아래와 같이 보관합니다.</p>
+        <hr class="api-sep">
+        <b class="api-h">Google Apps Script 웹 앱에서 열 때</b>
+        <p>인증 키를 웹 앱(스크립트 속성)에 보관하고, AI 요청도 웹 앱이 대신 보냅니다. 키가 교사 화면으로 전달되지 않으며, 한 번 저장하면 PC와 휴대폰 어디서든 다시 입력하지 않습니다.</p>
+        <hr class="api-sep">
+        <b class="api-h">두루보드 주소로 열 때</b>
+        <p>설정에서 보관 방식을 고릅니다.</p>
+        <ul class="keep-list">
+          <li><b>저장 안 함</b> 페이지를 닫으면 삭제 (기본)</li>
+          <li><b>이 탭 동안</b> 탭을 닫으면 삭제</li>
+          <li><b>기기에 잠금 저장</b> 지문·얼굴·PIN으로 잠가 이 기기에 30일간 보관, 사용할 때 같은 방법으로 해제</li>
+        </ul>
+        <p class="sub">잠금 저장은 지원하는 브라우저·기기에서만 선택할 수 있으며, 개인 기기에서만 사용하십시오. 휴대폰에서는 카카오톡 등 앱 안이 아닌 사파리·크롬에서 여십시오.</p>
+        <hr class="api-sep">
+        <p class="sub">어느 방식이든 두루보드 전용 키를 발급하고, 공급자 화면에서 사용 한도를 설정하여 사용하십시오.</p>
+      </div>
+    </section>
+
+    <!-- 연동 방식 -->
+    <section class="block">
+      <h2 class="h2"><span class="tag">연동 방식</span></h2>
+      <div class="safe api">
+        <b class="api-h">일반 서버</b>
+        <p>자료 제공 서버가 아래 주소로 표 형태의 자료를 응답하면, 두루보드에서 도메인과 인증코드를 입력하여 사용합니다.</p>
+        <pre class="code">GET https://{도메인}/api/v1/data
+Authorization: Bearer {인증코드}</pre>
+        <hr class="api-sep">
+        <b class="api-h">Google Apps Script 웹 앱</b>
+        <p>웹 앱이 두루보드 화면을 불러와 보여 줍니다. 웹 앱 주소 뒤에 <code class="inl">?view=duruboard</code>를 붙여 열고 [불러오기]를 누르면 됩니다.</p>
+        <pre class="code">https://script.google.com/…/exec?view=duruboard</pre>
+        <p class="sub">학교 계정 로그인으로 확인하므로 인증코드가 필요 없고, 기존 배포를 그대로 사용합니다. 웹 앱에서 허용한 교사 계정만 자료를 볼 수 있으며, 분석 파트너의 AI 인증 키도 웹 앱에 보관됩니다.</p>
+        <hr class="api-sep">
+        <p class="sub">어느 방식이든 응답에 포함할 정보는 자료 제공자(교사)가 결정합니다.</p>
+      </div>
+    </section>
+
+    <!-- 기존 시스템 연결 -->
+    <section class="block">
+      <h2 class="h2"><span class="tag">기존 시스템 연결</span></h2>
+      <div class="safe api">
+        <p>이미 운영 중인 사이트나 시스템을 두루보드와 연결하려면, 생성형 AI(코딩 도우미)에게 기존 시스템의 소스 코드와 함께 아래 요청문을 전달하십시오.</p>
+        <p class="sub">요청문은 고칠 필요 없이 그대로 보내면 됩니다. AI가 소스 코드에서 전송할 수 있는 자료를 찾아 목록으로 보여 주고 어떤 자료를 보낼지 물어보므로, 그때 고르십시오. 사용 기술 파악, 인증코드 발급과 연결 정보 안내도 규격 문서의 작업 지시에 들어 있습니다.</p>
+        <div class="prompt-box">
+          <button type="button" class="copy-btn" id="copy-prompt">요청문 복사</button>
+          <pre class="code prompt" id="prompt-text">아래 두루보드 규격 문서의 &#x27;0. AI 코딩 도우미에게&#x27;에 따라 이 시스템에 두루보드 연결 기능을 추가해 주십시오.
+
+(이어서 두루보드 규격 문서 전문)</pre>
+        </div>
+        <p class="sub">[요청문 복사]를 누르면 위 요청문과 함께 <b>규격 문서 전문</b>(약 <span id="spec-len">13,000</span>자)이 한 번에 복사됩니다. AI 채팅창에 그대로 붙여 넣으면 되며, AI가 웹 주소를 열 수 없어도 진행됩니다. Google Apps Script 웹 앱이면 AI가 위 '웹 앱 안에서 열기' 방식으로 구현합니다.</p>
+        <script type="text/plain" id="spec-md">
+# 두루보드 자료 제공 규격 (v1, 초안)
+
+두루보드와 연동하려는 서버가 지켜야 할 약속입니다.
+
+## 0. AI 코딩 도우미에게 (작업 지시)
+
+이 문서를 받은 AI 코딩 도우미는 함께 받은 시스템에 '두루보드 자료 제공 기능'을 아래 순서로 추가하십시오. 기존 기능과 화면은 변경하지 마십시오.
+
+**먼저 확인할 것**
+
+- 소스 코드를 보고 사용 기술(언어·프레임워크·자료 저장 방식)을 파악하여 그 방식에 맞게 구현하십시오.
+- **구현을 시작하기 전에 반드시 교사에게 어떤 자료를 전송할지 물으십시오.** 답을 받기 전에는 코드를 변경하지 마십시오.
+  - 소스 코드에서 전송할 수 있는 자료의 후보(예: 활동지 1~6 제출 여부, 형성평가 점수)를 찾아 목록으로 보여 주고, 교사가 고르게 하십시오.
+  - 행을 구분하는 값(예: 학번)도 후보를 제시하여 확인받으십시오. 이 값을 식별 열(`role: "id"`)로 지정하고, 한 행이 그 값 하나(예: 학생 한 명)에 대응하도록 구성합니다.
+  - 이름·연락처 등 개인정보는 기본으로 제외하고, 포함할지 교사에게 확인받으십시오.
+  - 교사가 요청문에 전송할 자료를 이미 적었더라도, 위 목록으로 한 번 더 확인받으십시오.
+
+**구현할 내용**
+
+1. 요청 받기: 일반 서버는 1장(`GET /api/v1/data`, `Authorization: Bearer` 인증, CORS)을 따릅니다. **Google Apps Script 웹 앱은 3장의 '가. 웹 앱 안에서 열기'를 사용합니다**(인증코드 불필요, 기존 배포 그대로). 이 방식을 쓸 수 없는 경우에만 '나. 인증코드 방식'을 사용합니다.
+2. 인증코드(1장·3장 나 방식): 관리자가 발급·폐기할 수 있게 하고, 원문은 저장하지 않고 해시로만 보관합니다. 인증코드마다 응답할 표(범위)를 정할 수 있게 합니다.
+3. 응답: 2장 형식(`meta`·`columns`·`rows`)을 따릅니다. 요청 한 번에 표 하나, 값은 숫자·문자·true/false·null만 사용합니다. 제출 여부는 1/0, 점수는 숫자, 미제출·미응시는 null로 표현합니다.
+4. 제한과 오류: 응답 20MB·50,000행 이하, 요청이 너무 많으면 429. 오류 응답에 개인정보나 내부 정보를 넣지 않습니다.
+5. 분석 파트너 인증 키(Apps Script 가 방식): 3장의 '다. 분석 파트너 인증 키 중계' 함수 세 개(`duruboardAiStatus`·`duruboardAiSetKey`·`duruboardAi`)도 같은 `.gs` 파일에 넣습니다. 교사에게 따로 묻지 않고 기본으로 넣습니다.
+6. 연결 안내: 인증코드를 발급하면 4장의 '두루보드 연결 정보'를 한 번 표시합니다. '웹 앱 안에서 열기'는 인증코드가 없으므로, 두루보드를 여는 주소(예: `…/exec?view=duruboard`)와 볼 수 있는 계정 목록을 교사에게 알려 줍니다.
+
+**Apps Script로 구현할 때 코드 제공 방식**
+
+- 두루보드 관련 코드는 **`.gs` 파일 하나**(예: `Duruboard.gs`)에 모두 넣으십시오. 여러 파일로 나누지 않습니다.
+- 그 파일의 **전체 코드를 생략 없이** 제공하여, 교사가 [+] → [스크립트]로 새 파일을 만든 뒤 그대로 붙여 넣으면 되게 하십시오.
+- 기존 파일의 수정은 최소한으로 하고, 필요한 경우(예: 기존 `doGet`에 두루보드 분기 한 줄 추가) **어느 파일의 어느 함수, 어디에 넣는지**와 넣을 코드를 정확히 적으십시오. `doGet`은 프로젝트에 하나만 있어야 하므로, 기존 `doGet`이 있으면 새 파일에 `doGet`을 만들지 마십시오.
+- 기존 `doGet`이 없는 새 프로젝트이면 `doGet`까지 그 한 파일에 넣으십시오.
+
+**완료 후 교사에게 알려 줄 것**
+
+- 변경·추가한 파일 목록
+- 시험 방법(일반 서버는 curl 명령)과 실제 응답 예시
+- **두루보드 사용 순서**: 교사가 그대로 따라 할 수 있도록 1, 2, 3… 번호를 붙인 단계로 안내하십시오. 각 단계에는 누를 메뉴·버튼 이름과 입력할 값을 이 시스템에 맞는 실제 값(주소, 계정, 함수 이름 등)으로 적고, 전문 용어는 풀어 쓰십시오. 구현한 방식에 맞추어 아래 틀을 따르십시오.
+
+  Apps Script 웹 앱 — 가. 웹 앱 안에서 열기
+  1. Apps Script 편집기에서 `DURU_ALLOWED`에 두루보드를 볼 교사 계정이 들어 있는지 확인합니다.
+  2. [배포] → [배포 관리] → 기존 웹 앱 배포의 연필 아이콘 → 버전 '새 버전' → [배포]를 누릅니다. (코드를 고친 뒤에는 새 버전으로 배포해야 반영됩니다. 웹 앱 주소는 바뀌지 않습니다.)
+  3. 허용한 교사 계정으로 로그인한 브라우저에서 `(실제 웹 앱 주소)?view=duruboard`를 엽니다.
+  4. 두루보드 화면에서 [불러오기]를 누릅니다.
+  5. 오른쪽 아래 [개체]로 그래프·표·통계를 추가하고, 레이아웃 설정에서 레이아웃을 저장하거나 내보냅니다.
+  6. 자주 쓰면 3번 주소를 브라우저 즐겨찾기에 추가합니다.
+  7. (분석 파트너를 쓸 경우) 오른쪽 위 레이아웃 설정 › 분석 파트너에서 공급자를 고르고 인증 키를 입력한 뒤 [저장]을 누릅니다. 키는 웹 앱(스크립트 속성)에 보관되어 다음부터 어느 기기에서나 다시 입력하지 않습니다.
+
+  일반 서버(1장) 또는 Apps Script 나. 인증코드 방식
+  1. 변경한 코드를 서버에 반영(배포)합니다. (반영 방법을 이 시스템 기준으로 구체적으로 적습니다.)
+  2. 인증코드를 발급합니다. (실행할 명령 또는 함수와 누를 메뉴를 적습니다.) 화면에 나온 '두루보드 연결 정보'를 따로 기록합니다. 인증코드는 이때 한 번만 보입니다.
+  3. 두루보드(`https://dinosinfolee.github.io/toy/duruboard/`)를 엽니다.
+  4. '도메인 또는 웹 앱 주소' 칸과 '인증코드' 칸에 2번에서 기록한 값을 입력하고 [조회]를 누릅니다.
+  5. 오른쪽 아래 [개체]로 그래프·표·통계를 추가하고, 레이아웃 설정에서 레이아웃을 저장하거나 내보냅니다.
+  6. 인증코드가 유출되었거나 더 이상 쓰지 않으면 폐기합니다. (폐기 방법을 적습니다.)
+
+  마지막에 '문제가 생기면' 항목으로, 자주 나는 오류(권한 없음, 자료가 비어 있음, 연결 실패)와 확인할 점을 짧게 덧붙이십시오.
+
+## 1. 요청
+
+```
+GET https://{도메인}/api/v1/data
+Authorization: Bearer {인증코드}
+Accept: application/json
+```
+
+- HTTPS만 허용합니다.
+- 조회 전용(GET)입니다.
+- 인증코드는 URL에 넣지 않고 `Authorization` 헤더로만 받습니다.
+- 인증코드가 없거나 틀리면 401, 권한이 없으면 403, 경로가 없으면 404, 요청이 너무 많으면 429로 응답합니다.
+- CORS: 두루보드는 브라우저에서 직접 요청하므로 다음 머리글로 응답합니다. 쿠키를 쓰지 않고 Bearer 인증만 사용하므로 모든 출처를 허용해도 됩니다.
+  - `Access-Control-Allow-Origin: *`
+  - `Access-Control-Allow-Headers: Authorization, Accept`
+  - `Access-Control-Allow-Methods: GET, OPTIONS` (OPTIONS 사전 요청에는 204로 응답)
+- 응답 머리글: `Content-Type: application/json; charset=utf-8`
+- **요청 한 번에 표 하나**를 응답합니다. 여러 표를 보여 주려면 서버가 다음 중 하나를 택합니다.
+  - 행 단위가 같으면(예: 학생 한 명당 한 행) 열을 붙여 **하나의 표로 병합**합니다.
+  - 행 단위가 다르면 **표마다 다른 인증코드**를 발급하고, 인증코드에 따라 해당 표를 응답합니다.
+
+## 2. 응답
+
+```json
+{
+  "meta": {
+    "id": "progress",
+    "title": "단원별 진도 현황",
+    "source": "시험 서버",
+    "updatedAt": "2026-10-18T09:00:00+09:00"
+  },
+  "columns": [
+    { "key": "id", "label": "번호", "type": "string", "role": "id" }
+  ],
+  "rows": [
+    { "id": "S01", "1단원": "완료", "2단원": null },
+    { "id": "S02", "1단원": "완료", "2단원": "완료" }
+  ]
+}
+```
+
+### 수록 정보
+
+이 규격은 자료의 형식만 정하며, 특정 정보(이름·학번 등)를 요구하지 않습니다. 응답에 포함할 정보는 자료 제공자(교사)가 결정합니다. 위 예시의 값은 모두 가상의 값입니다.
+
+| 항목 | 필수 | 설명 |
+|---|---|---|
+| `rows` | 필수 | 행 객체의 배열. 키는 모든 행에서 모아 사용합니다. |
+| `columns` | 선택 | 열별 표시 이름(`label`), 자료형(`type`: `number` 수치 / `string` 문자 / `boolean` 논리 / `mixed` 혼합), 식별 열 여부(`role`: `"id"`) |
+| `meta` | 선택 | `id`(표 구분 이름), `title`(제목), `source`(출처), `updatedAt`(기준 시각) |
+
+레이아웃(그래프·표·통계 구성)은 응답에 넣지 않습니다. 교사가 두루보드에서 직접 구성하며, 구성은 교사의 브라우저에 저장되고 [레이아웃 내보내기]·[레이아웃 불러오기]로 다른 교사와 나눌 수 있습니다. 응답에 `layout`이 있어도 두루보드는 사용하지 않습니다.
+
+
+## 3. Apps Script 연결 방식 (Google Apps Script 웹 앱)
+
+Google Apps Script 웹 앱은 요청 머리글(`Authorization`)을 읽을 수 없고, 상태 코드와 사전 요청(OPTIONS)을 직접 정할 수 없습니다. 그래서 아래 두 방식 중 하나를 사용합니다. **가 방식을 권장합니다.**
+
+| | 가. 웹 앱 안에서 열기 (권장) | 나. 인증코드 방식 |
+|---|---|---|
+| 배포 | 기존 배포 그대로 (학교 도메인 가능) | 두루보드용 '모든 사용자' 배포 추가 |
+| 확인 방법 | 학교 계정 로그인 + 허용 계정 목록 | 인증코드 |
+| 교사가 여는 주소 | 웹 앱 주소 + `?view=duruboard` | 두루보드 주소에 웹 앱 주소·인증코드 입력 |
+
+### 가. 웹 앱 안에서 열기 (권장)
+
+웹 앱이 GitHub에 게시된 두루보드 화면을 불러와 자기 화면으로 보여 줍니다. 두루보드는 이 경우를 스스로 알아채고(`google.script.run` 존재), 주소·인증코드 입력 없이 [불러오기]를 누르면 웹 앱의 `duruboardData()` 함수를 호출하여 자료를 받습니다. 다른 사이트로 요청하지 않으므로 학교 계정 로그인이 그대로 적용됩니다.
+
+- 두루보드 게시 주소: `https://dinosinfolee.github.io/toy/duruboard/` (`index.html`, `app.js`, `style.css`, `vendor/chart.umd.js`)
+- 웹 앱이 제공할 것
+  1. `doGet`: `view=duruboard`이면 허용 계정인지 확인한 뒤 두루보드 화면을 응답합니다. 그 밖의 요청은 기존 화면을 그대로 응답합니다.
+  - 위 코드는 `.gs` 파일 하나(예: `Duruboard.gs`)에 모두 넣습니다(0장 '코드 제공 방식' 참고).
+  2. `duruboardData()`: 허용 계정인지 다시 확인한 뒤 2장 형식의 자료를 **JSON 문자열**로 돌려줍니다. 오류는 예외(`throw new Error('…')`)로 알립니다.
+- 허용 계정: 자료를 볼 교사 계정을 목록으로 정합니다(학생 계정은 자료를 받을 수 없어야 합니다). `Session.getActiveUser().getEmail()`로 확인합니다.
+- 배포는 바꾸지 않습니다. 실행 계정 '나', 액세스는 기존대로(예: 학교 도메인) 둡니다.
+
+```javascript
+const DURU_BASE = 'https://dinosinfolee.github.io/toy/duruboard/';
+const DURU_ALLOWED = ['teacher@school.kr'];   // 두루보드를 볼 수 있는 계정
+
+function doGet(e) {
+  if (e && e.parameter && e.parameter.view === 'duruboard') return duruboardPage();
+  return 기존화면(e);                            // 기존 doGet 내용
+}
+
+function duruboardPage() {
+  if (!duruAllowed()) return HtmlService.createHtmlOutput('두루보드를 볼 권한이 없습니다. 허용된 교사 계정으로 접속하십시오.');
+  let html = UrlFetchApp.fetch(DURU_BASE + 'index.html').getContentText('UTF-8');
+  html = html
+    .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/i, '')      // 웹 앱 화면 안에서 실행되도록 제거
+    .replace(/(src|href)="(?!https?:|data:|#)([^"]+)"/g, (m, a, p) => a + '="' + DURU_BASE + p + '"');
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('두루보드')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function duruboardData() {
+  if (!duruAllowed()) throw new Error('두루보드를 볼 권한이 없습니다.');
+  return JSON.stringify({
+    meta: { id: 'progress', title: '활동지 제출 현황', updatedAt: new Date().toISOString() },
+    columns: [ /* 2장 형식 */ ],
+    rows: getRows()                                // 교사가 고른 자료만
+  });
+}
+
+function duruAllowed() {
+  return DURU_ALLOWED.indexOf(Session.getActiveUser().getEmail()) >= 0;
+}
+```
+
+- 교사는 웹 앱 주소 뒤에 `?view=duruboard`를 붙여 열면 됩니다(예: `https://script.google.com/a/macros/school.kr/s/…/exec?view=duruboard`). 구현이 끝나면 이 주소와 허용 계정 목록을 교사에게 알려 줍니다.
+- 개인 Gmail 계정 등에서 `Session.getActiveUser().getEmail()`이 비어 있으면 권한 확인을 할 수 없으므로, 그 경우 교사에게 알리고 나 방식을 사용합니다.
+- 레이아웃 파일 내려받기 등 일부 기능은 웹 앱 화면의 보안 제한으로 동작하지 않을 수 있습니다.
+
+### 나. 인증코드 방식
+
+가 방식을 쓸 수 없을 때(예: 웹 앱에서 접속 계정을 확인할 수 없는 경우) 사용합니다. 교사가 두루보드 주소 칸에 웹 앱 주소(`…/exec`)를 입력하면 두루보드가 이 방식으로 요청합니다. 응답 자료의 형식(2장)은 같습니다.
+
+#### 요청
+
+```
+POST https://script.google.com/macros/s/{배포 ID}/exec
+Content-Type: text/plain;charset=utf-8
+
+{"code":"{인증코드}","api":"duruboard/v1"}
+```
+
+- 교사는 두루보드의 주소 칸에 **웹 앱 주소 전체**(`…/exec`)를 입력합니다. 주소 뒤에 다른 경로를 붙이지 않습니다.
+- 인증코드는 주소(쿼리)가 아니라 **요청 본문**으로 보냅니다.
+- `Content-Type: text/plain`이므로 사전 요청(OPTIONS)이 발생하지 않습니다.
+- Apps Script는 응답을 `script.googleusercontent.com`을 거쳐 전달합니다. 두루보드는 이 주소로의 전달만 허용합니다.
+
+#### 응답
+
+- 정상: 2장과 같은 `{ "meta": …, "columns": …, "rows": … }`
+- 오류: 상태 코드 대신 본문에 표시합니다.
+
+```json
+{ "error": { "status": 401, "message": "인증코드가 유효하지 않습니다." } }
+```
+
+| status | 의미 |
+|---|---|
+| 401 | 인증코드가 없거나 틀림 |
+| 403 | 권한 없음 |
+| 429 | 요청이 너무 많음 |
+| 500 | 서버 오류 |
+
+#### 구현 예시 (Apps Script)
+
+```javascript
+function doPost(e) {
+  let body = {};
+  try { body = JSON.parse(e.postData.contents); } catch (err) {}
+  if (!isValidCode(body.code)) return json({ error: { status: 401, message: '인증코드가 유효하지 않습니다.' } });
+  return json({ meta: { id: 'progress', title: '활동지 제출 현황' }, columns: [ /* … */ ], rows: getRows() });
+}
+function doGet() { return json({ error: { status: 405, message: '두루보드에서 POST로 요청하십시오.' } }); }
+function json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+```
+
+- 인증코드는 스크립트 속성(`PropertiesService`)에 해시(`Utilities.computeDigest`)로 저장합니다. 발급 시 연결 안내는 4장을 따릅니다.
+- 배포: [배포] → [새 배포] → 유형 '웹 앱', 실행 계정 '나', 액세스 권한 '모든 사용자'. 인증코드가 없으면 자료를 응답하지 않으므로 자료는 보호됩니다.
+- 학교(Google Workspace) 계정에서 '모든 사용자' 배포가 막혀 있으면 두루보드에서 연결할 수 없습니다. 이 경우 관리자에게 문의하십시오.
+
+#### 기존 Apps Script 프로젝트에 추가하는 경우
+
+학생용 웹 앱처럼 이미 학교 도메인으로 배포된 프로젝트에 추가할 때는, 교사의 수고를 줄이기 위해 **같은 프로젝트에 배포를 하나 더 만드는 방식**을 사용합니다.
+
+- 기존 배포(학교 도메인)는 변경하지 않습니다. 두루보드용으로 새 배포(액세스 '모든 사용자')를 하나 추가합니다.
+- 두 배포는 같은 코드를 쓰므로, 두루보드용 주소로 기존 화면이 열리지 않게 막습니다.
+  - `doGet` 첫머리에서 `Session.getActiveUser().getEmail()`이 비어 있거나 학교 도메인이 아니면 기존 화면 대신 "학교 계정으로 접속하십시오" 안내만 응답합니다.
+  - 기존 `doPost`가 있으면, 본문의 `api`가 `"duruboard/v1"`일 때만 두루보드 응답으로 보내고 나머지는 기존 처리를 그대로 따릅니다. 기존 처리에도 위와 같은 학교 계정 확인을 넣습니다.
+- 인증코드가 틀린 요청이 짧은 시간에 반복되면(예: 10분에 10회) `CacheService`로 기록하여 잠시 `{"error":{"status":429}}`로 거부합니다.
+- 교사가 할 일은 [배포] → [새 배포] → 웹 앱, 액세스 '모든 사용자'로 배포하고, 발급 함수를 한 번 실행하는 것뿐이 되도록 구현합니다.
+
+### 다. 분석 파트너 인증 키 중계 (가 방식에서 사용)
+
+가 방식에서는 분석 파트너의 AI 인증 키를 웹 앱의 **스크립트 속성**에 보관하고, AI 요청도 웹 앱이 대신 보냅니다. 키는 교사 화면(브라우저)으로 전달되지 않으며, 볼 수 있는 사람은 스크립트 편집 권한자뿐입니다. 두루보드는 아래 함수가 있으면 스스로 이 방식을 사용하고, 없으면 화면에서 키를 입력하는 방식으로 동작합니다.
+
+- `duruboardAiStatus()`: 공급자별 키 저장 여부만 돌려줍니다(키 값은 돌려주지 않음).
+- `duruboardAiSetKey(provider, key)`: 키를 저장합니다. 빈 값이면 삭제합니다.
+- `duruboardAi(req)`: 두루보드가 만든 요청(`provider`·`url`·`method`·`body`)에 저장된 키를 붙여 공급자에 보내고 `{ status, body }`를 돌려줍니다. **요청 주소는 아래 4개 공급자 주소로 시작하는 경우에만** 보냅니다.
+- 세 함수 모두 허용 계정인지 먼저 확인합니다(가 방식의 `duruAllowed()` 사용).
+
+```javascript
+const DURU_AI = {
+  openai:    { base: 'https://api.openai.com/v1/',                       head: (k) => ({ Authorization: 'Bearer ' + k }) },
+  anthropic: { base: 'https://api.anthropic.com/v1/',                    head: (k) => ({ 'x-api-key': k, 'anthropic-version': '2023-06-01' }) },
+  gemini:    { base: 'https://generativelanguage.googleapis.com/v1beta/', head: (k) => ({ 'x-goog-api-key': k }) },
+  upstage:   { base: 'https://api.upstage.ai/v1/',                       head: (k) => ({ Authorization: 'Bearer ' + k }) }
+};
+
+function duruboardAiStatus() {
+  if (!duruAllowed()) throw new Error('두루보드를 볼 권한이 없습니다.');
+  const props = PropertiesService.getScriptProperties();
+  const saved = {};
+  Object.keys(DURU_AI).forEach((id) => { saved[id] = !!props.getProperty('DURU_AI_KEY_' + id); });
+  return JSON.stringify({ relay: 1, saved: saved });
+}
+
+function duruboardAiSetKey(provider, key) {
+  if (!duruAllowed()) throw new Error('두루보드를 볼 권한이 없습니다.');
+  if (!DURU_AI[provider]) throw new Error('지원하지 않는 공급자입니다.');
+  key = String(key || '').trim();
+  if (key.length > 500) throw new Error('인증 키가 너무 깁니다.');
+  const props = PropertiesService.getScriptProperties();
+  if (key) props.setProperty('DURU_AI_KEY_' + provider, key);
+  else props.deleteProperty('DURU_AI_KEY_' + provider);
+  return duruboardAiStatus();
+}
+
+function duruboardAi(reqText) {
+  if (!duruAllowed()) throw new Error('두루보드를 볼 권한이 없습니다.');
+  const req = JSON.parse(reqText);
+  const conf = DURU_AI[req.provider];
+  if (!conf) throw new Error('지원하지 않는 공급자입니다.');
+  if (typeof req.url !== 'string' || req.url.indexOf(conf.base) !== 0) throw new Error('허용되지 않은 요청 주소입니다.');
+  const key = PropertiesService.getScriptProperties().getProperty('DURU_AI_KEY_' + req.provider);
+  if (!key) throw new Error('인증 키가 저장되어 있지 않습니다.');
+  const opt = { method: req.method === 'get' ? 'get' : 'post', headers: conf.head(key), muteHttpExceptions: true };
+  if (opt.method === 'post') { opt.contentType = 'application/json'; opt.payload = String(req.body || ''); }
+  const res = UrlFetchApp.fetch(req.url, opt);
+  return JSON.stringify({ status: res.getResponseCode(), body: res.getContentText('UTF-8') });
+}
+```
+
+- 키는 두루보드 설정 화면에서 입력하는 것이 기본입니다. 편집기의 [프로젝트 설정] → [스크립트 속성]에서 `DURU_AI_KEY_openai`처럼 직접 추가해도 됩니다.
+- 허용 계정이면 누구나 이 키로 분석 파트너를 쓸 수 있습니다. 두루보드 전용 키를 발급하고 공급자 화면에서 사용 한도를 설정하도록 교사에게 안내하십시오.
+- 오류 응답 본문에는 키가 들어가지 않습니다. 실행 기록(`console.log`)에 키나 요청 본문을 남기지 마십시오.
+
+## 4. 인증코드 발급과 연결 안내 (1장·3장 나 방식)
+
+자료 제공 측은 인증코드를 발급할 때, 교사가 두루보드에 그대로 입력할 수 있도록 연결 정보를 **한 번만** 표시합니다. 인증코드 원문은 저장하지 않고 해시로만 보관하므로 다시 보여 줄 수 없습니다.
+
+```
+===== 두루보드 연결 정보 =====
+도메인 또는 웹 앱 주소: data.school.kr
+인증코드: dur_8Kq3…(발급 값)
+표: 활동지 제출 현황
+==============================
+```
+
+- 일반 서버: 관리 화면이나 명령 출력에 표시합니다. 주소 칸에는 도메인을 표시합니다(`/api/v1/data`는 두루보드가 붙입니다).
+- Apps Script: 발급 함수(예: `issueCode()`)를 편집기에서 실행하면 실행 로그(`Logger.log`)에 표시합니다. 웹 앱 주소는 `ScriptApp.getService().getUrl()`로 얻되, 배포 전이거나 `…/dev` 주소이면 "[배포] → [배포 관리]의 웹 앱 URL(…/exec)을 입력하십시오"라고 안내합니다.
+
+</script>
+      </div>
+    </section>
+
+    <section class="end">
+      <p>자료 제공 서버의 도메인과 인증코드를 준비한 뒤 시작하십시오. Apps Script 웹 앱은 웹 앱 주소에 ?view=duruboard를 붙여 여십시오.</p>
+      <a class="btn primary" href="index.html">두루보드 시작</a>
+    </section>
+  </main>
+
+  <footer class="foot">두루보드 · 정적 웹 페이지 · 그래프 도구 Chart.js(MIT)</footer>
+
+<script>
+(function () {
+  var root = document.documentElement, btn = document.getElementById('theme-btn');
+  var label = { auto: '자동', light: '밝게', dark: '어둡게' };
+  function apply(m) {
+    if (m === 'light' || m === 'dark') root.setAttribute('data-theme', m); else root.removeAttribute('data-theme');
+    btn.dataset.mode = m;
+    btn.title = '화면 밝기: ' + label[m];
+    btn.setAttribute('aria-label', '화면 밝기: ' + label[m] + ' (누르면 변경)');
+  }
+  var saved = 'auto';
+  try { saved = localStorage.getItem('duru-intro-theme') || 'auto'; } catch (e) {}
+  apply(saved);
+  btn.addEventListener('click', function () {
+    var order = ['auto', 'light', 'dark'];
+    var next = order[(order.indexOf(btn.dataset.mode) + 1) % 3];
+    try { if (next === 'auto') localStorage.removeItem('duru-intro-theme'); else localStorage.setItem('duru-intro-theme', next); } catch (e) {}
+    apply(next);
+  });
+  // 요청문 복사
+  var cb = document.getElementById('copy-prompt');
+  if (cb) cb.addEventListener('click', function () {
+    var spec = (document.getElementById('spec-md').textContent || '').replace(/<\\\//g, '</').trim();
+    var text = '아래 두루보드 규격 문서의 \'0. AI 코딩 도우미에게\'에 따라 이 시스템에 두루보드 연결 기능을 추가해 주십시오.\n\n' +
+      '===== 두루보드 규격 문서 (API_SPEC.md) 시작 =====\n' + spec + '\n===== 두루보드 규격 문서 끝 =====';
+    var done = function () { cb.textContent = '복사하였습니다'; cb.classList.add('done'); setTimeout(function () { cb.textContent = '요청문 복사'; cb.classList.remove('done'); }, 1800); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { fallback(); });
+    else fallback();
+    function fallback() {
+      var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed'; ta.style.top = '-1000px'; document.body.appendChild(ta); ta.select();
+      var ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      if (ok) done(); else cb.textContent = '복사하지 못하였습니다';
+    }
+  });
+})();
+</script>
+</body>
+</html>
