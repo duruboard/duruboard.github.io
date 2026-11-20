@@ -2552,3 +2552,24 @@ body.embedded .conn-net { display: none !important; }
 #ai-key-hint, #ai-keep-note { margin: 0; }
 #ai-keep-field[hidden] { display: none; }
 #ai-key-del { min-width: 52px; }
+/* 인증코드·인증 키: 비밀번호 칸으로 인식되지 않도록 일반 칸에 글자만 가림 (브라우저의 비밀번호 저장 제안 방지) */
+input.secret { -webkit-text-security: disc; text-security: disc; }
+/* 앱 화면 잠금: 뒤의 자료가 보이지 않도록 불투명하게 덮음 */
+.lock-dlg { border: 0; padding: 0; margin: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; background: var(--bg); color: var(--text); }
+.lock-dlg::backdrop { background: var(--bg); }
+.lock-dlg[open] { display: flex; align-items: center; justify-content: center; }
+.lock-body { display: grid; justify-items: center; gap: 12px; padding: 24px 16px; max-width: 360px; text-align: center; }
+.lock-mark { width: 64px; height: 64px; }
+.lock-body h2 { margin: 4px 0 0; font-size: 20px; }
+.lock-text { margin: 0; color: var(--text-2); font-size: 14px; line-height: 1.6; }
+.lock-btn { min-width: 180px; margin-top: 8px; }
+.lock-out { font-size: 13px; color: var(--text-2); }
+.lock-body .msg { margin: 0; }
+/* 좁은 휴대폰 화면(자료 연결 후): 첫 줄은 로고와 단추, 보드 제목은 둘째 줄 전체 폭으로 */
+@media (max-width: 559.98px) {
+  body:not(:has(#view-board[hidden])) .app-header { flex-wrap: wrap; padding-right: max(16px, env(safe-area-inset-right, 0px)) !important; }
+  body:not(:has(#view-board[hidden])) .app-header .brand { flex: 1 1 100%; min-height: 44px; }
+  body:not(:has(#view-board[hidden])) .app-header .brand h1 { display: none; }
+  body:not(:has(#view-board[hidden])) .app-header .board-head { flex: 1 1 100%; margin: 10px 0 0; padding-left: 0; border-left: 0; }
+  body:not(:has(#view-board[hidden])) .app-header .board-head .bt-row h2 { font-size: 18px; }
+}

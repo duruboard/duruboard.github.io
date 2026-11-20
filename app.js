@@ -442,6 +442,14 @@
   // ───────────── Apps Script 웹 앱 안에서 열기 (내장 방식) ─────────────
   // Apps Script 웹 앱(HtmlService)이 이 화면을 불러와 보여 주는 경우, 다른 사이트로 요청하지 않고
   // 웹 앱의 함수 duruboardData()를 직접 호출하여 자료를 받음 (학교 계정 로그인으로 확인, 인증코드 불필요)
+  // 안드로이드 앱(TWA)으로 열렸는지: 앱의 시작 주소에 ?app=android를 붙이고, 같은 탭에서는 세션 저장소로 유지
+  const APP = (() => {
+    try {
+      const q = new URLSearchParams(location.search);
+      if (q.get('app') === 'android' || String(document.referrer || '').indexOf('android-app://') === 0) window.sessionStorage.setItem('duruboard:app', '1');
+      return window.sessionStorage.getItem('duruboard:app') === '1';
+    } catch (e) { return false; }
+  })();
   const EMBED = (() => { try { return !!(window.google && window.google.script && window.google.script.run); } catch (e) { return false; } })();
   function gasData() {
     return new Promise((resolve, reject) => {
@@ -4587,6 +4595,68 @@
     dropKey();
   }
 
+  // ── 앱 화면 잠금 (안드로이드 앱에서만) ──
+  // 자료가 화면에 있는 동안, 앱을 벗어난 지 5분이 지나거나 10분 동안 조작이 없으면 화면 전체를 잠금.
+  // 해제는 지문·얼굴·화면 잠금(패스키 본인 확인). 잠글 때 잠금 저장한 인증 키도 메모리에서 지움.
+  const LOCK_BG_MS = 5 * 60 * 1000;
+  const LOCK_IDLE_MS = 10 * 60 * 1000;
+  let lastAct = Date.now();
+  let hiddenAt = 0;
+  let screenLocked = false;
+  function lockScreen() {
+    if (!APP || !state.source || screenLocked) return;
+    screenLocked = true;
+    if (aiKey && lockFor(aiCfg.provider)) { aiKey = ''; $('ai-key').value = ''; syncKeyUi(); syncAiFab(); }
+    msgTo('lk-msg', '');
+    const d = $('dlg-lock');
+    if (!d.open) d.showModal();
+    setTimeout(() => $('lk-ok').focus(), 30);
+  }
+  // 본인 확인: 등록된 패스키로 확인하고, 없으면 새로 등록하면서 확인 (둘 다 기기의 지문·얼굴·화면 잠금 필요)
+  async function verifyUser() {
+    if (!prfAvailable()) throw Object.assign(new Error('nowebauthn'), { code: 'nowebauthn' });
+    const saved = store.get('appcred') || store.get('aikeycred');
+    if (saved) {
+      await navigator.credentials.get({ publicKey: { challenge: rnd(32), allowCredentials: [{ type: 'public-key', id: unb64(saved) }], userVerification: 'required', timeout: 60000 } });
+      return;
+    }
+    const c = await newCred(rnd(32));
+    store.set('appcred', b64(c.id));
+  }
+  async function unlockScreen() {
+    msgTo('lk-msg', '지문·얼굴·화면 잠금으로 확인하십시오.');
+    try {
+      await verifyUser();
+      screenLocked = false;
+      lastAct = Date.now();
+      $('dlg-lock').close();
+    } catch (e) {
+      msgTo('lk-msg', e && e.code === 'nowebauthn' ? '이 기기에서는 본인 확인을 사용할 수 없습니다. [연결 해제하고 처음 화면으로]를 누르십시오.'
+        : e && e.name === 'NotAllowedError' ? '확인이 취소되었거나 시간이 초과되었습니다. 다시 시도하십시오.'
+        : '본인 확인에 실패하였습니다. 다시 시도하거나 연결을 해제하십시오.', 'error');
+    }
+  }
+  function initAppLock() {
+    if (!APP) return;
+    document.documentElement.classList.add('in-app');
+    ['pointerdown', 'keydown', 'wheel', 'touchstart', 'input'].forEach((ev) => document.addEventListener(ev, () => { if (!screenLocked) lastAct = Date.now(); }, { passive: true, capture: true }));
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (hiddenAt && Date.now() - hiddenAt >= LOCK_BG_MS) lockScreen();
+      hiddenAt = 0;
+    });
+    setInterval(() => { if (!document.hidden && Date.now() - lastAct >= LOCK_IDLE_MS) lockScreen(); }, 15000);
+    $('lk-ok').addEventListener('click', unlockScreen);
+    $('lk-out').addEventListener('click', () => {
+      screenLocked = false;
+      $('dlg-lock').close();
+      if ($('dlg-ai').open) $('dlg-ai').close();
+      document.querySelectorAll('dialog[open]').forEach((d) => { try { d.close(); } catch (e) { /* 무시 */ } });
+      disconnect();
+    });
+    $('dlg-lock').addEventListener('cancel', (e) => e.preventDefault());   // 뒤로 가기·Esc로 닫히지 않게
+  }
+
   // ── 웹 앱 중계 (Apps Script: duruboardAiStatus · duruboardAiSetKey · duruboardAi) ──
   function gasCall(fn, args, ms) {
     return new Promise((resolve, reject) => {
@@ -5691,7 +5761,18 @@
   }
 
   // ───────────── 이벤트 연결 ─────────────
+  // 글자 가림(-webkit-text-security)을 지원하지 않는 브라우저에서는 비밀번호 칸으로 되돌려 값이 화면에 보이지 않게 함
+  function initSecretInputs() {
+    let ok = false;
+    try { ok = !!(window.CSS && CSS.supports && (CSS.supports('-webkit-text-security', 'disc') || CSS.supports('text-security', 'disc'))); } catch (e) { ok = false; }
+    document.querySelectorAll('input.secret').forEach((i) => {
+      if (!ok) i.type = 'password';
+      // 비밀번호 칸처럼 복사·잘라내기를 막음
+      ['copy', 'cut'].forEach((ev) => i.addEventListener(ev, (e) => e.preventDefault()));
+    });
+  }
   function init() {
+    try { initSecretInputs(); } catch (e) { /* 무시 */ }
     // 웹 앱 안에서 열린 경우의 화면 전환은 다른 초기화보다 먼저 (다른 부분에 문제가 있어도 적용되게)
     try { initEmbed(); } catch (e) { /* 무시 */ }
     const savedDomain = store.get('domain');
@@ -5796,6 +5877,9 @@
 
     initBuilder();
     initAI();
+    try { initAppLock(); } catch (e) { /* 무시 */ }
+    // 앱 설치·오프라인 첫 화면용 서비스 워커 (웹 앱 안이나 로컬 파일에서는 사용하지 않음)
+    try { if (!EMBED && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* 무시 */ }
     initAuto();
 
     try {

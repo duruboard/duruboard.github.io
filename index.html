@@ -6,10 +6,13 @@
   <meta name="referrer" content="no-referrer">
   <!-- 이 페이지의 스크립트는 같은 폴더의 파일만 실행하고, 자료 요청은 HTTPS(및 로컬 시험 주소)로만 보냅니다. -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https: http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https: http://localhost:* http://127.0.0.1:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>두루보드</title>
+  <meta name="theme-color" content="#3f4fc4">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2048%2048%22%3E%3Crect%20x%3D%224%22%20y%3D%2222%22%20width%3D%2211%22%20height%3D%2222%22%20rx%3D%225.5%22%20fill%3D%22%23c6cdff%22/%3E%3Crect%20x%3D%2217%22%20y%3D%227%22%20width%3D%2214%22%20height%3D%2237%22%20rx%3D%227%22%20fill%3D%22%239ea6fc%22/%3E%3Crect%20x%3D%2233%22%20y%3D%2215%22%20width%3D%2211%22%20height%3D%2229%22%20rx%3D%225.5%22%20fill%3D%22%23c4b5fd%22/%3E%3Ccircle%20cx%3D%2221.6%22%20cy%3D%2219%22%20r%3D%221.7%22%20fill%3D%22%233d2280%22/%3E%3Ccircle%20cx%3D%2226.4%22%20cy%3D%2219%22%20r%3D%221.7%22%20fill%3D%22%233d2280%22/%3E%3Cpath%20d%3D%22M22.2%2022.4q1.8%201.8%203.6%200%22%20fill%3D%22none%22%20stroke%3D%22%233d2280%22%20stroke-width%3D%221.4%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="style.css?v=20261110b">
+  <link rel="stylesheet" href="style.css?v=20261120c">
 </head>
 <body>
   <header class="app-header">
@@ -103,7 +106,7 @@
       <div class="ai-field" id="ai-key-field">
         <label class="field-label" for="ai-key">인증 키</label>
         <span class="ai-model-row">
-          <input id="ai-key" type="password" spellcheck="false" autocomplete="off" placeholder="공급자에서 발급받은 API 키">
+          <input id="ai-key" class="secret" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" data-1p-ignore data-lpignore="true" data-form-type="other" placeholder="공급자에서 발급받은 API 키">
           <button type="button" id="ai-key-btn" class="btn small">저장</button>
           <button type="button" id="ai-key-del" class="btn small" hidden>삭제</button>
         </span>
@@ -214,7 +217,7 @@
             </label>
             <label class="field conn-net">
               <span>인증코드</span>
-              <input id="in-code" type="password" spellcheck="false" autocomplete="off" placeholder="서버에서 발급받은 인증코드">
+              <input id="in-code" class="secret" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" data-1p-ignore data-lpignore="true" data-form-type="other" placeholder="서버에서 발급받은 인증코드">
             </label>
             <label class="check conn-net">
               <input id="chk-save-domain" type="checkbox">
@@ -650,6 +653,18 @@
     </div>
   </dialog>
 
+  <!-- 앱 화면 잠금 (안드로이드 앱에서만) -->
+  <dialog id="dlg-lock" class="lock-dlg" aria-labelledby="lk-title">
+    <div class="lock-body">
+      <svg class="lock-mark" viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="22" width="11" height="22" rx="5.5" fill="#c6cdff"/><rect x="17" y="7" width="14" height="37" rx="7" fill="#9ea6fc"/><rect x="33" y="15" width="11" height="29" rx="5.5" fill="#c4b5fd"/><circle cx="21.6" cy="19" r="1.7" fill="#3d2280"/><circle cx="26.4" cy="19" r="1.7" fill="#3d2280"/><path d="M22.2 22.4q1.8 1.8 3.6 0" fill="none" stroke="#3d2280" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <h2 id="lk-title">화면이 잠겼습니다</h2>
+      <p id="lk-text" class="lock-text">학생 자료를 보호하기 위해 일정 시간이 지나 화면을 잠갔습니다. 지문·얼굴·화면 잠금으로 본인을 확인하십시오.</p>
+      <button type="button" id="lk-ok" class="btn primary lock-btn">잠금 해제</button>
+      <button type="button" id="lk-out" class="link lock-out">연결 해제하고 처음 화면으로</button>
+      <p id="lk-msg" class="msg" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
+
   <dialog id="dlg-confirm" class="dialog">
     <div class="dialog-body">
       <p id="cm-text"></p>
@@ -661,6 +676,6 @@
   </dialog>
 
   <script src="vendor/chart.umd.js"></script>
-  <script src="app.js?v=20261110b"></script>
+  <script src="app.js?v=20261120c"></script>
 </body>
 </html>

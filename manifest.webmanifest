@@ -1,0 +1,21 @@
+{
+  "name": "두루보드",
+  "short_name": "두루보드",
+  "description": "교사가 받은 학습 자료를 그래프·표·통계로 정리하는 교실용 현황판",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "ko",
+  "dir": "ltr",
+  "background_color": "#f6f7f9",
+  "theme_color": "#3f4fc4",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#3f4fc4">
+  <title>두루보드 개인정보처리방침</title>
+  <style>
+    :root { --bg: #f6f7f9; --surface: #ffffff; --text: #1d2330; --text-2: #5b6575; --line: #e3e6ec; --accent: #3f4fc4; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #12161c; --surface: #1a2029; --text: #e6e9ee; --text-2: #9aa4b2; --line: #2b3340; --accent: #8a93f5; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.75 system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; word-break: keep-all; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 24px; margin: 0 0 4px; }
+    .date { color: var(--text-2); margin: 0 0 24px; font-size: 14px; }
+    section { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin: 0 0 14px; }
+    h2 { font-size: 17px; margin: 0 0 8px; color: var(--accent); }
+    p { margin: 0 0 8px; }
+    ul { margin: 0 0 4px; padding-left: 20px; }
+    li { margin: 2px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; vertical-align: top; padding: 8px 6px; border-top: 1px solid var(--line); }
+    th { color: var(--text-2); font-weight: 600; white-space: nowrap; }
+    a { color: var(--accent); }
+    .sub { color: var(--text-2); font-size: 14px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>두루보드 개인정보처리방침</h1>
+  <p class="date">시행일: 2026년 11월 20일</p>
+
+  <section>
+    <h2>1. 기본 원칙</h2>
+    <p>두루보드(웹 및 안드로이드 앱, 이하 '두루보드')는 교사가 직접 연결한 자료 서버의 자료를 교사의 기기 화면에 그래프·표·통계로 보여 주는 도구입니다.</p>
+    <p><b>두루보드 운영자는 별도의 서버를 운영하지 않으며, 이용자의 개인정보나 학생 자료를 수집·저장·전송받지 않습니다.</b> 모든 처리는 이용자의 기기 안에서 이루어집니다.</p>
+  </section>
+
+  <section>
+    <h2>2. 기기 안에서 처리하는 정보</h2>
+    <table>
+      <tr><th>정보</th><td>처리 방식</td></tr>
+      <tr><th>받은 자료</th><td>교사가 연결한 자료 서버에서 받은 자료는 화면 표시에만 사용하며, 기기에 저장하지 않습니다. 앱이나 페이지를 닫으면 사라집니다.</td></tr>
+      <tr><th>인증코드</th><td>자료 서버 연결에 쓰는 인증코드는 저장하지 않으며, 페이지가 열려 있는 동안 메모리에만 보관합니다.</td></tr>
+      <tr><th>설정</th><td>레이아웃(그래프·표 구성), 화면 밝기, 그래프 색상, 분석 파트너 설정(공급자·모델·열별 전송 방식), 교사가 선택한 경우 자료 서버 주소를 기기의 브라우저 저장소에 저장합니다. 학생 자료 값은 포함되지 않습니다.</td></tr>
+      <tr><th>AI 인증 키</th><td>교사가 고른 방식에 따라서만 보관합니다. '저장 안 함'은 메모리에만, '이 탭 동안'은 탭을 닫을 때까지, '기기에 잠금 저장'은 지문·얼굴·화면 잠금 확인으로 얻은 값으로 암호화하여 기기에 최대 30일간 보관합니다. 운영자에게 전송되지 않습니다.</td></tr>
+      <tr><th>패스키</th><td>인증 키 잠금과 앱 화면 잠금 해제를 위해 기기의 비밀번호 관리자(예: Google 비밀번호 관리자)에 패스키를 등록할 수 있습니다. 생체 정보는 기기의 운영체제가 처리하며 두루보드는 이를 받지 않습니다.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. 외부로 전송되는 경우</h2>
+    <ul>
+      <li><b>자료 서버:</b> 교사가 입력한 자료 서버(학교·교사가 운영하는 시스템)에 인증코드를 붙여 자료를 요청합니다. 해당 서버의 정보 처리는 그 서버 운영자의 방침을 따릅니다.</li>
+      <li><b>AI 공급자(분석 파트너 사용 시에만):</b> 교사가 분석 파트너를 사용하면, 교사가 열별로 정한 범위의 자료(전송·가명·제외)만 교사가 선택한 AI 공급자(OpenAI, Anthropic, Google Gemini, Upstage 중 하나)에 교사의 인증 키로 전송합니다. 가명으로 지정한 값은 ID-01과 같은 번호로 바꾸어 보내며, 원래 값은 기기 화면에서만 확인합니다. 전송된 자료의 처리는 해당 AI 공급자의 정책을 따릅니다.</li>
+      <li><b>Google Apps Script 웹 앱으로 여는 경우:</b> 자료와 인증 키 보관은 교사가 만든 웹 앱(Google)에서 처리됩니다.</li>
+      <li><b>화면 파일 제공:</b> 두루보드 화면 파일은 GitHub Pages에서 제공되며, 접속 시 GitHub가 일반적인 접속 기록(IP 주소 등)을 처리할 수 있습니다.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>4. 이용 대상</h2>
+    <p>두루보드는 교사용 도구이며, 아동이나 학생이 직접 사용하도록 만든 서비스가 아닙니다. 자료에 포함할 학생 정보의 범위는 자료를 제공하는 교사·기관이 정합니다.</p>
+  </section>
+
+  <section>
+    <h2>5. 삭제 방법</h2>
+    <ul>
+      <li>두루보드 화면의 [초기화](휴지통 단추)를 누르면 기기에 저장된 두루보드 정보(설정·레이아웃·잠금 저장한 인증 키)가 모두 삭제됩니다.</li>
+      <li>안드로이드 앱을 삭제하거나 브라우저의 사이트 데이터를 삭제해도 지워집니다.</li>
+      <li>등록한 패스키는 기기의 비밀번호 관리자에서 삭제할 수 있습니다.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>6. 문의 및 변경</h2>
+    <p>문의: <a href="mailto:문의-이메일을-입력하십시오">문의-이메일을-입력하십시오</a></p>
+    <p class="sub">이 방침이 바뀌면 이 페이지에 시행일과 함께 게시합니다.</p>
+  </section>
+</main>
+</body>
+</html>
