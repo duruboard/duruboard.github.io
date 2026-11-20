@@ -10,6 +10,7 @@
 
   // ───────────── 설정값 ─────────────
   const API_PATH = '/api/v1/data';
+  const DEMO_WORD = 'test';
   const FETCH_TIMEOUT_MS = 15000;
   const MAX_BYTES = 20 * 1024 * 1024;
   const MAX_ROWS = 50000;
@@ -364,6 +365,11 @@
   function normalizeOrigin(input) {
     let s = (input || '').trim();
     if (!s) throw new Error('도메인 또는 웹 앱 주소를 입력하십시오.');
+    // 체험: 도메인 칸에 test → 두루보드와 함께 게시된 가상 자료(api/v1/data)를 조회
+    if (s.toLowerCase() === DEMO_WORD) {
+      const url = new URL('api/v1/data', location.href).href;
+      return { gas: false, demo: true, origin: location.origin, url, id: 'demo', label: '체험 자료 (가상 학생 30명)' };
+    }
     if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) s = 'https://' + s;
     let u;
     try { u = new URL(s); } catch (e) { throw new Error('주소 형식이 올바르지 않습니다.'); }
@@ -383,7 +389,7 @@
 
   function updatePreview() {
     let text = 'GET https://(도메인)' + API_PATH;
-    try { const tg = normalizeOrigin($('in-domain').value); text = tg.gas ? 'POST ' + tg.url + ' (Apps Script 연결 방식)' : 'GET ' + tg.url; } catch (e) { /* 미리보기만 유지 */ }
+    try { const tg = normalizeOrigin($('in-domain').value); text = tg.demo ? '체험 자료 (가상 학생 30명) · 인증코드 test' : tg.gas ? 'POST ' + tg.url + ' (Apps Script 연결 방식)' : 'GET ' + tg.url; } catch (e) { /* 미리보기만 유지 */ }
     $('req-preview').textContent = text;
   }
 
@@ -508,6 +514,7 @@
         origin = normalizeOrigin($('in-domain').value);
         code = $('in-code').value.trim();
         if (!code && !codeLockFor(origin.id)) throw new Error('인증코드를 입력하십시오.');
+        if (origin.demo && code.toLowerCase() !== DEMO_WORD) throw new Error('체험 인증코드는 test입니다.');
       }
     } catch (e) { setMsg(e.message, 'error'); return; }
 
@@ -534,7 +541,7 @@
       if (await applyFetched(parsed, src, isRefetch)) {
         authCode = code;
         serverOrigin = origin;
-        if (!isRefetch && !fromLock && $('chk-lock-code').checked) saveCodeLock(origin.id, code);
+        if (!isRefetch && !fromLock && !origin.demo && $('chk-lock-code').checked) saveCodeLock(origin.id, code);
       }
     } catch (e) {
       if (fromLock && /인증코드가 유효하지/.test(e.message)) { store.del(CODE_LOCK); syncCodeUi(); e.message += ' 잠금 저장한 인증코드를 삭제하였습니다. 새 인증코드를 입력하십시오.'; }
