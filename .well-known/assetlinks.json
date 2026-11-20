@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.duruboard.app",
+      "sha256_cert_fingerprints": [
+        "여기에_플레이_콘솔의_앱_서명_키_SHA-256_지문을_넣으십시오"
+      ]
+    }
+  }
+]
