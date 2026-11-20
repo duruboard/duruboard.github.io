@@ -507,9 +507,17 @@
       } else {
         origin = normalizeOrigin($('in-domain').value);
         code = $('in-code').value.trim();
-        if (!code) throw new Error('인증코드를 입력하십시오.');
+        if (!code && !codeLockFor(origin.id)) throw new Error('인증코드를 입력하십시오.');
       }
     } catch (e) { setMsg(e.message, 'error'); return; }
+
+    // 인증코드를 비워 두고 [조회]를 누르면 잠금 저장한 인증코드를 지문·얼굴·화면 잠금으로 해제하여 사용
+    let fromLock = false;
+    if (!isRefetch && !code) {
+      setMsg('지문·얼굴·화면 잠금으로 확인하십시오.');
+      try { code = await unlockCode(codeLockFor(origin.id)); fromLock = true; }
+      catch (e) { setMsg(lockErr(e).replace('[이 탭 동안]을 사용하십시오.', '인증코드를 입력하십시오.'), 'error'); return; }
+    }
 
     if (!isRefetch) {
       if ($('chk-save-domain').checked) store.set('domain', $('in-domain').value.trim());
@@ -526,8 +534,10 @@
       if (await applyFetched(parsed, src, isRefetch)) {
         authCode = code;
         serverOrigin = origin;
+        if (!isRefetch && !fromLock && $('chk-lock-code').checked) saveCodeLock(origin.id, code);
       }
     } catch (e) {
+      if (fromLock && /인증코드가 유효하지/.test(e.message)) { store.del(CODE_LOCK); syncCodeUi(); e.message += ' 잠금 저장한 인증코드를 삭제하였습니다. 새 인증코드를 입력하십시오.'; }
       if (e.spec) { setMsg('자료 규격 오류: ' + e.message, 'error'); showSpecError(e, origin); }
       else setMsg(e.message, 'error');
     } finally {
@@ -4595,6 +4605,84 @@
     dropKey();
   }
 
+  // ── 인증코드 잠금 저장 (선택) ──
+  // 조회에 성공한 인증코드를 지문·얼굴·화면 잠금 확인으로 얻은 값(PRF)으로 암호화하여 이 기기에 30일간 보관
+  const CODE_LOCK = 'codelock';
+  function codeLockRec() {
+    try {
+      const o = JSON.parse(store.get(CODE_LOCK) || 'null');
+      if (!o || o.v !== 1) return null;
+      if (!(o.exp > Date.now())) { store.del(CODE_LOCK); return null; }
+      return o;
+    } catch (e) { return null; }
+  }
+  function codeLockFor(originId) { const o = codeLockRec(); return o && o.o === originId ? o : null; }
+  async function lockCode(originId, code) {
+    if (!prfAvailable()) throw Object.assign(new Error('noprf'), { code: 'noprf' });
+    const salt = rnd(32);
+    let id = null, secret = null;
+    const saved = store.get('appcred') || store.get('aikeycred');
+    if (saved) { id = unb64(saved); secret = await prfEval(id, salt); }
+    else {
+      const c = await newCred(salt);
+      if (!c.ok) { prfCap = false; throw Object.assign(new Error('noprf'), { code: 'noprf' }); }
+      id = c.id;
+      store.set('appcred', b64(id));
+      secret = c.first || await prfEval(id, salt);
+    }
+    if (!secret) { prfCap = false; throw Object.assign(new Error('noprf'), { code: 'noprf' }); }
+    prfCap = true;
+    const ck = await crypto.subtle.importKey('raw', secret, 'AES-GCM', false, ['encrypt']);
+    const iv = rnd(12);
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, ck, new TextEncoder().encode(code));
+    store.set(CODE_LOCK, JSON.stringify({ v: 1, o: originId, cred: b64(id), salt: b64(salt), iv: b64(iv), ct: b64(ct), exp: Date.now() + LOCK_DAYS * 864e5 }));
+  }
+  async function unlockCode(o) {
+    if (!o) throw new Error('잠금 저장한 인증코드가 없습니다.');
+    const secret = await prfEval(unb64(o.cred), unb64(o.salt));
+    if (!secret) throw Object.assign(new Error('noprf'), { code: 'noprf' });
+    const ck = await crypto.subtle.importKey('raw', secret, 'AES-GCM', false, ['decrypt']);
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(o.iv) }, ck, unb64(o.ct));
+    return new TextDecoder().decode(pt);
+  }
+  async function saveCodeLock(originId, code) {
+    try {
+      await lockCode(originId, code);
+      $('in-code').value = '';
+      syncCodeUi();
+      setMsg('자료를 조회했습니다. 인증코드를 이 기기에 잠금 저장하였습니다(' + LOCK_DAYS + '일 후 자동 삭제).', 'ok');
+    } catch (e) {
+      $('chk-lock-code').checked = false;
+      syncCodeUi();
+      setMsg('자료를 조회했습니다. 다만 인증코드를 잠금 저장하지 못하였습니다. ' + lockErr(e).replace(' [이 탭 동안]을 사용하십시오.', ''), 'error');
+    }
+  }
+  // 인증코드 칸: 지금 입력한 주소의 잠금 저장이 있으면 비워 두고 [조회]로 해제하도록 안내
+  function syncCodeUi() {
+    const box = $('lock-code-row');
+    if (!box) return;
+    box.hidden = EMBED || !prfAvailable() || prfCap === false;
+    let id = '';
+    try { id = normalizeOrigin($('in-domain').value).id; } catch (e) { id = ''; }
+    const rec = id ? codeLockFor(id) : null;
+    $('in-code').placeholder = rec ? '잠금 저장됨 · 비워 두고 [조회]를 누르면 지문·얼굴·화면 잠금으로 해제' : '서버에서 발급받은 인증코드';
+    if (rec) $('chk-lock-code').checked = true;
+  }
+  function initCodeLock() {
+    $('chk-lock-code').addEventListener('change', (e) => {
+      if (e.target.checked) { $('chk-save-domain').checked = true; return; }
+      store.del(CODE_LOCK);
+      syncCodeUi();
+      setMsg('이 기기에 잠금 저장한 인증코드를 삭제하였습니다.', 'ok');
+    });
+    $('chk-save-domain').addEventListener('change', (e) => {
+      if (!e.target.checked && $('chk-lock-code').checked) { $('chk-lock-code').checked = false; store.del(CODE_LOCK); syncCodeUi(); }
+    });
+    $('in-domain').addEventListener('input', syncCodeUi);
+    syncCodeUi();
+    detectPrf().then((c) => { if (prfCap === null) prfCap = c; syncCodeUi(); });
+  }
+
   // ── 앱 화면 잠금 (안드로이드 앱에서만) ──
   // 자료가 화면에 있는 동안, 앱을 벗어난 지 5분이 지나거나 10분 동안 조작이 없으면 화면 전체를 잠금.
   // 해제는 지문·얼굴·화면 잠금(패스키 본인 확인). 잠글 때 잠금 저장한 인증 키도 메모리에서 지움.
@@ -5878,6 +5966,7 @@
     initBuilder();
     initAI();
     try { initAppLock(); } catch (e) { /* 무시 */ }
+    try { initCodeLock(); } catch (e) { /* 무시 */ }
     // 앱 설치·오프라인 첫 화면용 서비스 워커 (웹 앱 안이나 로컬 파일에서는 사용하지 않음)
     try { if (!EMBED && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* 무시 */ }
     initAuto();

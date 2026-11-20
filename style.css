@@ -2573,3 +2573,5 @@ input.secret { -webkit-text-security: disc; text-security: disc; }
   body:not(:has(#view-board[hidden])) .app-header .board-head { flex: 1 1 100%; margin: 10px 0 0; padding-left: 0; border-left: 0; }
   body:not(:has(#view-board[hidden])) .app-header .board-head .bt-row h2 { font-size: 18px; }
 }
+/* 연결 화면: 하단 안내를 연결 양식과 같은 폭·위치로 맞춤 */
+body:has(#view-board[hidden]) .app-footer > p { max-width: var(--cw); margin-left: auto; margin-right: auto; padding-left: 18px; padding-right: 18px; box-sizing: border-box; }
