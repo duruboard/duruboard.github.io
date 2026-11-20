@@ -10,7 +10,9 @@
 
   // ───────────── 설정값 ─────────────
   const API_PATH = '/api/v1/data';
-  const DEMO_WORD = 'test';
+  const DEMO_WORD = 'duruduru';      // 체험 신호: 도메인 칸에 이 단어를 입력
+  const DEMO_CODE = 'test';          // 공개 체험 인증코드 (자료 체험만)
+  const DEMO_AI_FILE = 'demo-ai.json';  // 비공개 체험 코드로 암호화한 체험용 AI 인증 키
   const FETCH_TIMEOUT_MS = 15000;
   const MAX_BYTES = 20 * 1024 * 1024;
   const MAX_ROWS = 50000;
@@ -389,7 +391,7 @@
 
   function updatePreview() {
     let text = 'GET https://(도메인)' + API_PATH;
-    try { const tg = normalizeOrigin($('in-domain').value); text = tg.demo ? '체험 자료 (가상 학생 30명) · 인증코드 test' : tg.gas ? 'POST ' + tg.url + ' (Apps Script 연결 방식)' : 'GET ' + tg.url; } catch (e) { /* 미리보기만 유지 */ }
+    try { const tg = normalizeOrigin($('in-domain').value); text = tg.demo ? '체험 자료 (가상 학생 30명) · 인증코드 ' + DEMO_CODE : tg.gas ? 'POST ' + tg.url + ' (Apps Script 연결 방식)' : 'GET ' + tg.url; } catch (e) { /* 미리보기만 유지 */ }
     $('req-preview').textContent = text;
   }
 
@@ -514,7 +516,6 @@
         origin = normalizeOrigin($('in-domain').value);
         code = $('in-code').value.trim();
         if (!code && !codeLockFor(origin.id)) throw new Error('인증코드를 입력하십시오.');
-        if (origin.demo && code.toLowerCase() !== DEMO_WORD) throw new Error('체험 인증코드는 test입니다.');
       }
     } catch (e) { setMsg(e.message, 'error'); return; }
 
@@ -524,6 +525,14 @@
       setMsg('지문·얼굴·화면 잠금으로 확인하십시오.');
       try { code = await unlockCode(codeLockFor(origin.id)); fromLock = true; }
       catch (e) { setMsg(lockErr(e).replace('[이 탭 동안]을 사용하십시오.', '인증코드를 입력하십시오.'), 'error'); return; }
+    }
+
+    // 체험: 공개 코드는 자료만, 비공개 체험 코드는 체험용 AI 인증 키까지 해제
+    let demoUnlocked = null;
+    if (!isRefetch && origin.demo && code.toLowerCase() !== DEMO_CODE) {
+      setMsg('체험 코드를 확인하고 있습니다…');
+      try { demoUnlocked = await demoUnlock(code); }
+      catch (e) { setMsg(e.message, 'error'); return; }
     }
 
     if (!isRefetch) {
@@ -541,6 +550,7 @@
       if (await applyFetched(parsed, src, isRefetch)) {
         authCode = code;
         serverOrigin = origin;
+        if (!isRefetch) setDemoAi(origin.demo ? demoUnlocked : null);
         if (!isRefetch && !fromLock && !origin.demo && $('chk-lock-code').checked) saveCodeLock(origin.id, code);
       }
     } catch (e) {
@@ -728,6 +738,7 @@
     authCode = null;
     serverOrigin = null;
     $('in-code').value = '';
+    setDemoAi(null);
     destroyCharts();
     state.source = null; state.rows = []; state.rawRows = []; state.keys = []; state.typeOver = {}; state.keyInfo = new Map(); state.layout = []; state.groups = []; state.meta = {};
     closePop();
@@ -1547,7 +1558,7 @@
     $('in-domain').dispatchEvent(new Event('input'));
     $('chk-save-domain').checked = false;
     globalColors = {};
-    setAuto(0); aiCfg = { provider: 'openai', model: '' }; aiKeyReset(); renderAiSettings(); syncAiFab();
+    setAuto(0); aiCfg = { provider: 'openai', model: '' }; demoAi = null; aiKeyReset(); renderAiSettings(); syncAiFab();
     applyTheme('auto');
     setMsg('초기화하였습니다. 보드와 이 브라우저에 저장된 두루보드 정보를 모두 삭제하였습니다.', 'ok');
   }
@@ -4284,6 +4295,7 @@
   const AI_TIMEOUT_MS = 90000;
   let aiCfg = { provider: 'openai', model: '' };
   let aiKey = '';                 // 인증 키: 메모리에만 보관
+  let demoAi = null;              // 체험용 AI { p: 공급자, m: 모델, k: 인증 키 } — 메모리에만 보관
   let aiMsgs = [];                // 대화 기록 (공급자 공통 형식)
   let aiBusy = false;
   let aiAbort = null;
@@ -4296,7 +4308,43 @@
   function aiProv() {
     return AI_PROVIDERS[aiCfg.provider] || AI_PROVIDERS.openai;
   }
-  function aiModel() { return (aiCfg.model || '').trim() || aiProv().model; }
+  // 체험용 키는 해당 공급자를 고르고 본인 키를 입력하지 않았을 때만 사용
+  function demoOn() { return !!demoAi && aiCfg.provider === demoAi.p && !aiKey && !gasRelay; }
+  function aiModel() { return (aiCfg.model || '').trim() || (demoOn() ? demoAi.m : '') || aiProv().model; }
+  function aiWho() { return aiProv().label + ' · ' + aiModel() + (demoOn() ? ' · 체험용' : ''); }
+
+  // ── 체험용 AI 인증 키: 비공개 체험 코드로 복호화 (PBKDF2-SHA256 → AES-GCM) ──
+  async function demoUnlock(code) {
+    const bad = new Error('체험 인증코드가 올바르지 않습니다. 자료만 체험하려면 인증코드 칸에 ' + DEMO_CODE + '를 입력하십시오.');
+    let rec;
+    try {
+      const res = await fetch(new URL(DEMO_AI_FILE, location.href).href, { cache: 'no-store', credentials: 'omit' });
+      if (!res.ok) throw bad;
+      rec = await res.json();
+    } catch (e) { throw bad; }
+    if (!rec || rec.v !== 1 || !rec.salt || !rec.iv || !rec.ct) throw bad;
+    const ub = (t) => Uint8Array.from(atob(t), (c) => c.charCodeAt(0));
+    try {
+      const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(code), 'PBKDF2', false, ['deriveKey']);
+      const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: ub(rec.salt), iterations: Math.min(Math.max(Number(rec.iter) || 600000, 100000), 2000000) },
+        base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+      const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ub(rec.iv) }, key, ub(rec.ct));
+      const o = JSON.parse(new TextDecoder().decode(pt));
+      if (!o || !AI_PROVIDERS[o.p] || typeof o.k !== 'string' || !o.k) throw bad;
+      return { p: o.p, m: typeof o.m === 'string' ? o.m.trim().slice(0, 100) : '', k: o.k };
+    } catch (e) { throw bad; }
+  }
+  function setDemoAi(d) {
+    if (!d && !demoAi) return;
+    demoAi = d;
+    // 체험용 공급자로 전환 (교사의 저장된 설정은 바꾸지 않음)
+    if (d && !aiKey) { aiCfg = { provider: d.p, model: '' }; dropKey(); }
+    aiMsgs = [];
+    renderAiSettings();
+    syncKeyUi();
+    renderKeep();
+    syncAiFab();
+  }
   function loadAiCfg() {
     try {
       const o = JSON.parse(store.get('ai') || 'null');
@@ -4457,6 +4505,7 @@
     field.hidden = !!gasRelay;
     $('ai-key-hint').textContent = gasRelay
       ? '인증 키는 이 웹 앱(Apps Script 스크립트 속성)에 보관되며 화면으로 전달되지 않습니다. AI 요청은 웹 앱이 대신 보냅니다.'
+      : demoOn() ? '체험용 인증 키를 사용하고 있습니다. 다른 공급자를 고르거나 본인 키를 입력하면 그 키를 사용합니다.'
       : '두루보드 전용 키를 발급하고, 공급자 화면에서 사용 한도를 설정하여 사용하십시오.';
     if (gasRelay) return;
     $('ai-keep').querySelectorAll('button').forEach((b) => {
@@ -4512,7 +4561,7 @@
     inp.readOnly = has || locked;
     inp.classList.toggle('locked', has || locked);
     if (locked) inp.value = '';
-    inp.placeholder = locked ? '잠금 저장됨 · 지문·얼굴·PIN으로 해제' : '공급자에서 발급받은 API 키';
+    inp.placeholder = locked ? '잠금 저장됨 · 지문·얼굴·PIN으로 해제' : demoOn() ? '체험용 키 사용 중 · 본인 키를 입력하면 그 키를 사용' : '공급자에서 발급받은 API 키';
     btn.textContent = locked ? '해제' : has ? '수정' : '저장';
     btn.classList.toggle('primary', !has);
     btn.disabled = !has && !locked && !inp.value.trim();
@@ -5164,8 +5213,9 @@
     return Promise.race([fetch(url, Object.assign({ credentials: 'omit', referrerPolicy: 'no-referrer' }, opt)), stop]).finally(() => clearTimeout(timer));
   }
   function authHead(p) {
-    return p.api === 'ant' ? { 'x-api-key': aiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
-      : p.api === 'gem' ? { 'x-goog-api-key': aiKey } : { Authorization: 'Bearer ' + aiKey };
+    const k = aiKey || (demoOn() ? demoAi.k : '');
+    return p.api === 'ant' ? { 'x-api-key': k, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
+      : p.api === 'gem' ? { 'x-goog-api-key': k } : { Authorization: 'Bearer ' + k };
   }
   // 공급자 요청: 웹 앱 중계가 있으면 웹 앱이 저장된 키로 대신 보내고, 없으면 이 브라우저에서 직접 보냄
   function aiReq(url, body) {
@@ -5277,7 +5327,7 @@
   }
 
   // ── 대화 화면 ──
-  function aiReady() { return gasRelay ? !!gasRelay.saved[aiCfg.provider] : !!aiKey; }
+  function aiReady() { return gasRelay ? !!gasRelay.saved[aiCfg.provider] : !!aiKey || demoOn(); }
   // 분석 파트너 단추: 자료를 연결하고 인증 키를 입력한 경우에만 왼쪽 아래에 표시
   function syncAiFab() { $('btn-ai').hidden = !(state.source && (aiReady() || aiLocked())); }
   function aiScroll() { const l = $('ai-log'); l.scrollTop = l.scrollHeight; }
@@ -5652,9 +5702,9 @@
   }
   function openAi(toggle) {
     const d = $('dlg-ai');
-    if (d.open) { if (toggle === true) d.close(); else { closePop(); closeExport(); $('ai-who').textContent = aiProv().label + ' · ' + aiModel(); $('ai-in').focus(); } return; }
+    if (d.open) { if (toggle === true) d.close(); else { closePop(); closeExport(); $('ai-who').textContent = aiWho(); $('ai-in').focus(); } return; }
     closePop(); closeExport();
-    $('ai-who').textContent = aiProv().label + ' · ' + aiModel();
+    $('ai-who').textContent = aiWho();
     if (!aiMsgs.length) aiReset(); else aiGate();
     const dock = aiWide();
     d.classList.toggle('dock', dock);
@@ -5772,7 +5822,7 @@
       seg.append(b);
     });
     $('ai-model').value = aiCfg.model;
-    $('ai-model').placeholder = '예: ' + aiProv().model;
+    $('ai-model').placeholder = '예: ' + ((demoOn() && demoAi.m) || aiProv().model);
     $('ai-model-list').hidden = true;
     renderAiSendSum();
   }
