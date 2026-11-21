@@ -4292,7 +4292,10 @@
     upstage: { label: 'Upstage', model: 'solar-pro3', api: 'oai', url: 'https://api.upstage.ai/v1/chat/completions', list: 'https://api.upstage.ai/v1/models' }
   };
   const AI_MAX_ROUNDS = 8;
-  const AI_TIMEOUT_MS = 90000;
+  const AI_TIMEOUT_MS = 150000;    // 응답 전체를 한 번에 받는 방식의 제한 시간
+  const AI_FIRST_MS = 150000;      // 스트리밍: 첫 응답까지 기다리는 시간 (추론 모델은 첫 응답이 늦음)
+  const AI_IDLE_MS = 120000;       // 스트리밍: 응답이 이어지다 멈춘 채 기다리는 시간
+  const AI_NOSTREAM = {};          // 스트리밍을 거부한 공급자는 일반 요청으로 전환
   let aiCfg = { provider: 'openai', model: '' };
   let aiKey = '';                 // 인증 키: 메모리에만 보관
   let demoAi = null;              // 체험용 AI { p: 공급자, m: 모델, k: 인증 키 } — 메모리에만 보관
@@ -5263,6 +5266,63 @@
     if (o.type === 'OBJECT' && o.properties && !Object.keys(o.properties).length) delete o.properties;
     return o;
   }
+  // OpenAI 호환(OpenAI·Upstage) 스트리밍 요청: 응답이 오는 동안에는 시간 초과로 끊지 않음
+  async function oaiStream(p, payload) {
+    let rej, timer;
+    const stop = new Promise((_, r) => { rej = r; });
+    stop.catch(() => {});
+    const err = (m) => Object.assign(new Error(m), { name: 'AbortError' });
+    const arm = (ms) => { clearTimeout(timer); timer = setTimeout(() => rej(err('timeout')), ms); };
+    aiAbort = { abort() { rej(err('abort')); } };
+    arm(AI_FIRST_MS);
+    try {
+      const h = Object.assign({ 'Content-Type': 'application/json', Accept: 'text/event-stream' }, authHead(p));
+      const res = await Promise.race([fetch(p.url, { method: 'POST', headers: h, body: JSON.stringify(Object.assign({}, payload, { stream: true })), credentials: 'omit', referrerPolicy: 'no-referrer' }), stop]);
+      if (!res.ok || !/event-stream/.test(res.headers.get('content-type') || '') || !res.body) return { res };
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '', text = '', fin = false;
+      const calls = [];
+      const onLine = (line) => {
+        if (!line.startsWith('data:')) return;
+        const d = line.slice(5).trim();
+        if (!d) return;
+        if (d === '[DONE]') { fin = true; return; }
+        let j; try { j = JSON.parse(d); } catch (e) { return; }
+        if (j.error) throw new Error('공급자 오류가 발생하였습니다. (' + String(j.error.message || j.error.type || '').slice(0, 200) + ')');
+        const dl = j.choices && j.choices[0] && j.choices[0].delta;
+        if (!dl) return;
+        if (typeof dl.content === 'string') text += dl.content;
+        (dl.tool_calls || []).forEach((tc) => {
+          const i = typeof tc.index === 'number' ? tc.index : calls.length;
+          const c = calls[i] || (calls[i] = { id: '', name: '', args: '' });
+          if (tc.id) c.id = tc.id;
+          if (tc.function) {
+            if (tc.function.name && !c.name) c.name = tc.function.name;
+            if (typeof tc.function.arguments === 'string') c.args += tc.function.arguments;
+          }
+        });
+      };
+      while (!fin) {
+        const { done, value } = await Promise.race([reader.read(), stop.catch((e) => { try { reader.cancel(); } catch (x) { /* 무시 */ } throw e; })]);
+        if (done) break;
+        arm(AI_IDLE_MS);
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split(/\r?\n/);
+        buf = lines.pop();
+        lines.forEach(onLine);
+      }
+      if (buf) onLine(buf);
+      return {
+        text,
+        calls: calls.filter((c) => c && c.name).map((c) => {
+          let args = {};
+          try { args = JSON.parse(c.args || '{}'); } catch (e) { args = {}; }
+          return { id: c.id || uid(), name: c.name, args };
+        })
+      };
+    } finally { clearTimeout(timer); }
+  }
   async function aiCall() {
     const p = aiProv(), model = aiModel(), sys = aiSystem();
     if (p.api === 'oai') {
@@ -5275,7 +5335,16 @@
           messages.push(o);
         } else m.results.forEach((r) => messages.push({ role: 'tool', tool_call_id: r.id, content: r.content }));
       });
-      const res = await aiReq(p.url, JSON.stringify({ model, messages, tools: AI_TOOLS.map((t) => ({ type: 'function', function: t })) }));
+      const payload = { model, messages, tools: AI_TOOLS.map((t) => ({ type: 'function', function: t })) };
+      if (!gasRelay && !AI_NOSTREAM[aiCfg.provider]) {
+        const r = await oaiStream(p, payload);
+        if (!r.res) return { text: r.text, calls: r.calls, raw: null };
+        // 스트리밍을 지원하지 않는 경우(400 등)에만 일반 요청으로 다시 보냄
+        if (r.res.ok || r.res.status === 400) AI_NOSTREAM[aiCfg.provider] = true;
+        if (!r.res.ok && r.res.status !== 400) await aiJson(r.res);
+        if (r.res.ok) { const j0 = await aiJson(r.res); const m0 = (j0.choices && j0.choices[0] && j0.choices[0].message) || {}; return { text: typeof m0.content === 'string' ? m0.content : '', calls: (m0.tool_calls || []).filter((c) => c.function).map((c) => { let a = {}; try { a = JSON.parse(c.function.arguments || '{}'); } catch (e) { a = {}; } return { id: c.id || uid(), name: c.function.name, args: a }; }), raw: null }; }
+      }
+      const res = await aiReq(p.url, JSON.stringify(payload));
       const j = await aiJson(res);
       const msg = (j.choices && j.choices[0] && j.choices[0].message) || {};
       const calls = (msg.tool_calls || []).filter((c) => c.function).map((c) => {
@@ -5357,6 +5426,62 @@
     if (last < text.length) node.append(document.createTextNode(text.slice(last)));
   }
   // 답변 말풍선: 가명이 있으면 오른쪽 아래에 [실제 값 보기] 단추 (화면 공유 등을 고려해 기본은 가명 표시)
+  // 한 번의 질문에 대한 답변은 말풍선 하나에 모음 (도구 사용 내역은 말풍선 위쪽 한 줄, 개체 제안은 별도 카드)
+  function aiTurn() {
+    let bub = null, body = null, tline = null, bar = null, on = false;
+    const tools = [];
+    const ensure = () => {
+      if (bub) return;
+      const wrap = el('div');
+      tline = el('div', 'ai-tool in-bub');
+      tline.hidden = true;
+      body = el('div', 'ai-turn-body');
+      wrap.append(tline, body);
+      bub = aiBubble('bot', wrap);
+    };
+    const pnSync = () => {
+      const pns = bub.querySelectorAll('.ai-pn');
+      if (!pns.length) return;
+      if (!bar) {
+        bar = el('div', 'ai-pn-bar');
+        const btn = el('button', 'ai-pn-btn');
+        btn.type = 'button';
+        btn.title = '가명을 이 화면의 가명표로 실제 값으로 바꾸어 표시합니다. AI에게는 전송하지 않습니다.';
+        btn.addEventListener('click', () => { on = !on; pnSync(); });
+        bar.append(btn);
+        bub.append(bar);
+      }
+      const btn = bar.firstChild;
+      pns.forEach((x) => { x.textContent = on ? x.dataset.r : x.dataset.a; x.classList.toggle('on', on); x.title = on ? '가명 ' + x.dataset.a + '의 실제 값 (이 화면에서만 표시)' : '가명 ' + x.dataset.a; });
+      btn.textContent = on ? '가명으로 보기' : '실제 값 보기';
+      btn.setAttribute('aria-pressed', String(on));
+      bub.classList.toggle('revealed', on);
+    };
+    return {
+      text(t, interim) {
+        if (!String(t || '').trim()) return;
+        ensure();
+        const md = renderMd(t);
+        if (body.childNodes.length) md.classList.add('ai-turn-more');
+        if (interim) md.classList.add('ai-turn-note');   // 도구를 쓰기 전 중간 안내는 흐리게
+        body.append(md);
+        pnSync();
+        aiScroll();
+      },
+      tool(name, args, result) {
+        ensure();
+        let t = TOOL_LABEL[name] || name;
+        if (result && result.error) t += ' 실패';
+        else if (name === 'query_rows' && result) t += ' ' + result.returned + '행';
+        else if (name === 'aggregate' && result) t += ' ' + result.results + '개';
+        tools.push(t);
+        tline.replaceChildren(el('span', 'ai-tool-dot'), document.createTextNode(tools.join(' · ')));
+        tline.hidden = false;
+        aiScroll();
+      },
+      get node() { return bub; }
+    };
+  }
   function aiAnswer(text) {
     const md = renderMd(text);
     const b = aiBubble('bot', md);
@@ -5590,6 +5715,7 @@
     aiBubble('me', ub);
     aiMsgs.push({ role: 'user', text });
     aiSetBusy(true);
+    const turn = aiTurn();
     let nudged = false;
     const norm = (t) => String(t || '').replace(/\s+/g, '');
     const saidBefore = (t) => aiMsgs.some((m) => m.role === 'assistant' && m.text && norm(m.text) === norm(t));
@@ -5605,11 +5731,11 @@
           continue;
         }
         aiThinking(false);
-        if (r.text && !dup) aiAnswer(r.text);
+        if (r.text && !dup) turn.text(r.text, r.calls.length > 0);
         if (!r.calls.length) break;
         const results = r.calls.map((c) => {
           const out = runTool(c.name, c.args);
-          aiToolLine(c.name, c.args, out);
+          turn.tool(c.name, c.args, out);
           if (c.name === 'propose_object' && out.ok) proposalCard(out.proposalId);
           let s = JSON.stringify(out);
           if (s.length > 60000) s = JSON.stringify({ error: '결과가 너무 큽니다. 조건이나 limit으로 범위를 줄이십시오.' });
